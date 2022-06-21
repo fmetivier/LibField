@@ -39,7 +39,7 @@ def get_Tracks(
                 ]
             )
 
-        columns = ["Longitude", "Latitude", "Elevation", "Time", "Speed"]
+        columns = ["longitude", "latitude", "elevation", "time", "speed"]
         df = DataFrame(data, columns=columns)
         print(df.head())
         dflist.append(df)

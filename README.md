@@ -16,6 +16,7 @@ It also enables the real time connection to and acquisition from such devices th
 ## Requirements and Installation
 
 ## Examples
+For a complete example including construction of a folium map see samplescripts
 
 ### Retrieve waypoints from a gpx file
 
@@ -27,6 +28,9 @@ df = get_waypoints(filename)
 ```
 
 ### Get real time GPS
+
+Connection to a GPS antenna that can be connected to the USB or serial port of your computer.
+
 ```python
 from LibGPS import *
 
