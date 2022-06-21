@@ -1,0 +1,5 @@
+pynmea2
+gpxpy
+matplotlib
+geopandas
+pandas
