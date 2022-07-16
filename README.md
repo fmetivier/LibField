@@ -7,21 +7,22 @@
 
 
 
-## Introduction
+## Introduction <a class="anchor" id="introdcution"></a>
 
-LibGPS is a set of python functions that helps the handling of gps data.
-It provides simples functions to extract waypoints and tracks from gpx data files produced by Garmin or equivalent GPS devices
+LibGPS is a set of python functions that helps to handle gps data.
+It provides simples functions to extract waypoints and tracks from gpx data files produced by Garmin or equivalent GPS devices.
 It also enables the real time connection to and acquisition from such devices through NMEA protocol.
 
-## Requirements and Installation
+## Requirements and Installation <a class="anchor" id="requirements-and-installation"></a>
 
-## Examples
+## Examples <a class="anchor" id="examples"></a>
 For a complete example including construction of a folium map see samplescripts
 
 ### Retrieve waypoints from a gpx file
 
 ```python
 from LibGPS import *
+import pandas as pd
 
 filename = "../Data/c60x.gpx"
 df = get_waypoints(filename)
