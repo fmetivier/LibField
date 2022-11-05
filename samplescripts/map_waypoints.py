@@ -21,7 +21,7 @@ df = get_waypoints(filename)
 dflist = get_Tracks(filename)
 
 # Create the map
-macarte = folium.Map(location=[49.119777, 1.769824], zoom_start=19)
+macarte = folium.Map(location=[49.119777, 1.769824], zoom_start=21)
 hybrid = folium.TileLayer(
     tiles="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
     attr="Google",
