@@ -1,4 +1,2 @@
 pynmea2
 gpxpy
-matplotlib
-pandas

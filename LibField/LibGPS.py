@@ -1,12 +1,10 @@
 import serial
 import datetime
 import pynmea2
-import pandas as pd
-import geopandas as gpd
-import matplotlib.pyplot as plt
+import time
 
 
-def connect_gps(gps_port="ttyUSB0", gps_baudrate=9600):
+def connect_gps(gps_port="ttyACM0", gps_baudrate=115000):
     """
     connects to the GPS using serial ang returns the serial object
     written for lunix so by default opens ttyUSB0
@@ -33,18 +31,22 @@ def read_nmea(gps):
 
 
 if __name__ == "__main__":
-    gps = connect_gps("/dev/ttyUSB0")
+    gps = connect_gps("/dev/ttyACM0")
     idx = 0
-
-    while True:
+    collect = True
+    fname = "GPSout_%s.txt" % (str(int(time.time())))
+    f = open(fname, "w")
+    while collect == True:
         idx += 1
         parsed_line = read_nmea(gps)
         try:
-            print("########################")
-            print(parsed_line.sentence_type)
-            print("########################")
+            data = str(parsed_line).split(",")
+            print(str(parsed_line))
+            f.write(str(parsed_line) + "\n")
             for field in parsed_line.fields:
                 value = getattr(parsed_line, field[1])
-                print(f"{field[0]:40} {field[1]:20} {value}")
+                print("%s,%s" % (str(field[1]), value))
+                f.write("%s,%s\n" % (str(field[1]), value))
         except:
             pass
+    f.close()
