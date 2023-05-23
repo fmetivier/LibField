@@ -43,22 +43,24 @@ def read_nmea(raw_line):
     return parsed_line
 
 
-def launch_GPS(port="/dev/ttyACM0", namecode="001", t0=0):
+def launch_GPS(port="/dev/ttyACM0", t0=0):
     """connects to GPS
     get nmea sentence
     saves it to file for further processing
 
     param: port: str, port to open
     param: baudrate: int, communication rate in baud
+    param: t0: int local start time
     """
 
     gps = connect(port, 115000)
-    idx = 0
-    collect = True
-    fname = "GPSout_%s.txt" % (namecode)
-    f = open(fname, "w")
     global GPS_counter
     GPS_counter = 0
+
+    idx = 0
+    collect = True
+    fname = "GPSout_%s.txt" % (str(t0))
+    f = open(fname, "w")
 
     while collect == True:
         idx += 1
@@ -73,13 +75,14 @@ def launch_GPS(port="/dev/ttyACM0", namecode="001", t0=0):
     f.close()
 
 
-def launch_ADCP(port="/dev/ttyUSB0", namecode="001", t0=0):
+def launch_ADCP(port="/dev/ttyUSB0", t0=0):
     """connects to ADCP
         sends initialisation and test commands
         store ensembles
 
     param: port: str, port to open
-    param; baudrate: int, communication rate in bauds
+    param: baudrate: int, communication rate in bauds
+    param: t0: int local start time
     """
 
     ADCP = connect(port=port, baudrate=57600)
@@ -87,7 +90,7 @@ def launch_ADCP(port="/dev/ttyUSB0", namecode="001", t0=0):
     ADCP_counter = 0
 
     # wake ADCP
-    lfname = "ADCP_test_log_%s.txt" % (namecode)
+    lfname = "ADCP_test_log_%s.txt" % (str(t0))
     f = open(lfname, "w")
     f.write("#ADCP test log\n")
     f.close()
@@ -130,29 +133,29 @@ def launch_ADCP(port="/dev/ttyUSB0", namecode="001", t0=0):
             #     response = False
             #     time.sleep(0.1)
 
-    dfname = "ADCP_data_%s.txt" % (str(int(t0)))
+    dfname = "ADCP_data_%s.txt" % (str(t0))
     f = open(dfname, "w")
     f.write("#ADCP raw Data file")
     f.close()
 
 
-def launch_PA500(port="/dev/ttyUSB0", namecode="001"):
+def launch_PA500(port="/dev/ttyUSB0", t0=0):
     """Connects to a PA500 using USBserial connection
        collects nmea sentences
        saves them to file adding t-t0 timestamp and dateime.now()
 
     param: port: string name of the port to open
+    param: t0: int local start time
     """
 
     PA500 = connect("/dev/ttyUSB0")
     global PA_counter
     PA_counter = 0
-    
+
     response = True
-    t0 = time.time()
     oldT = t0
     bad_value = 0
-    fname = "PA500_%s.csv" % (namecode)
+    fname = "PA500_%s.csv" % (str(t0))
     f = open(fname, "w")
     f.write("# PA500 nmea sentence + t-t0 + datetime.now\n")
     f.close()
@@ -178,13 +181,16 @@ def launch_PA500(port="/dev/ttyUSB0", namecode="001"):
 if __name__ == "__main__":
 
     """Create threads one for each instrument
-       Create them as daemon so that when we decide to stop acquisition
-    all thread are killed (We do not use join)
+    Create them as daemon so that when we decide to stop acquisition all thread are killed (We do not use join)
     """
 
-    GPS = threading.Thread(target=launch_GPS, args=("/dev/ttyACM0",), daemon=True)
-    PA500 = threading.Thread(target=launch_PA500, args=("/dev/ttyUSB0",), daemon=True)
-    ADCP = threading.Thread(target=launch_ADCP, args=("/dev/ttyUSB1",), daemon=True)
+    t0 = int(time.time())
+
+    GPS = threading.Thread(target=launch_GPS, args=("/dev/ttyACM0", t0), daemon=True)
+    PA500 = threading.Thread(
+        target=launch_PA500, args=("/dev/ttyUSB0", t0), daemon=True
+    )
+    ADCP = threading.Thread(target=launch_ADCP, args=("/dev/ttyUSB1", t0), daemon=True)
 
     for i in range(200):
         print("ADCP: ", ADCP_counter)
