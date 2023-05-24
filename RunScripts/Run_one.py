@@ -1,8 +1,8 @@
-import threading
 import time
 import sys
+import os
 
-sys.path.append("/home/metivier/Nextcloud/src/LibField/")
+sys.path.append("/home/pi/Documents/LibField/")
 
 import LibField as LF
 
@@ -10,8 +10,18 @@ t0 = int(time.time())
 ADCP_counter = 0
 PA_counter = 0
 GPS_counter = 0
-DIRNAME = "/home/pi/Documents/Mayotte/Data"
 
+# targat data directory
+DIRNAME = "/home/pi/Documents/Mayotte/Data"
+if os.path.isdir(DIRNAME) == False:
+    os.mkdirs(DIRNAME)
+
+f = open(DIRNAME+"last_t0.txt", "w")
+f.write("%i" %(t0))
+f.close()
+
+
+# launch acquisition
 try:
     if len(sys.argv) > 1:
         print(sys.argv[1])

@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-sys.path.append("/home/metivier/Nextcloud/src/LibField/")
+sys.path.append("/home/pi/Documents/LibField/")
+# sys.path.append("/home/metivier/Nextcloud/src/LibField/")
 import LibField as LF
 
 
@@ -18,20 +19,19 @@ ADCP_counter = 0
 PA_counter = 0
 GPS_counter = 0
 
-"""
-TODO
-====
-créer un directory par acquisition avec toujours le même fichier à chaque fois
-bottle pour l'output au lieu de print
-démarrer dans le fichier rc.local
-"""
 DIRNAME = "/home/pi/Documents/Mayotte/Data"
 
-GPS = threading.Thread(target=LF.launch_GPS, args=("/dev/ttyACM0", t0, DIRNAME), daemon=True)
+GPS = threading.Thread(
+    target=LF.launch_GPS, args=("/dev/ttyACM0", t0, DIRNAME), daemon=True
+)
 
-PA500 = threading.Thread(target=LF.launch_PA500, args=("/dev/ttyUSB0", t0, DIRNAME), daemon=True)
+PA500 = threading.Thread(
+    target=LF.launch_PA500, args=("/dev/ttyUSB0", t0, DIRNAME), daemon=True
+)
 
-ADCP = threading.Thread(target=LF.launch_ADCP, args=("/dev/ttyUSB1", t0, DIRNAME), daemon=True)
+ADCP = threading.Thread(
+    target=LF.launch_ADCP, args=("/dev/ttyUSB1", t0, DIRNAME), daemon=True
+)
 
 GPS.start()
 PA500.start()

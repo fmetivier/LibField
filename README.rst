@@ -20,7 +20,7 @@ LibField comes along with a set of RunScripts to launch data acquisition.
 
 * Run_as_threads.py launches all instrument acquisitions as threads
 * Run_one.py is to be used on a command line terminal to laung one instrument
-* Run.py wraps three Run_one command line commands using os library.
+* Run_all.py wraps three Run_one commands using os.system() instruction.
 
 
 These files can then to be used with a Raspberry pi  to collects data and post logging information on the web.
