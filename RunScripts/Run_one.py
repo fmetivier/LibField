@@ -16,8 +16,8 @@ DIRNAME = "/home/pi/Documents/Mayotte/Data"
 if os.path.isdir(DIRNAME) == False:
     os.mkdirs(DIRNAME)
 
-f = open(DIRNAME+"last_t0.txt", "w")
-f.write("%i" %(t0))
+f = open(DIRNAME + "last_t0.txt", "w")
+f.write("%i" % (t0))
 f.close()
 
 
