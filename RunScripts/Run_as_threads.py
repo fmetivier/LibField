@@ -19,7 +19,7 @@ ADCP_counter = 0
 PA_counter = 0
 GPS_counter = 0
 
-DIRNAME = "/home/pi/Documents/Mayotte/Data"
+DIRNAME = "/home/pi/Documents/Mayotte/Data/"
 
 GPS = threading.Thread(
     target=LF.launch_GPS, args=("/dev/ttyACM0", t0, DIRNAME), daemon=True

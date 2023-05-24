@@ -12,7 +12,7 @@ PA_counter = 0
 GPS_counter = 0
 
 # targat data directory
-DIRNAME = "/home/pi/Documents/Mayotte/Data"
+DIRNAME = "/home/pi/Documents/Mayotte/Data/"
 if os.path.isdir(DIRNAME) == False:
     os.mkdirs(DIRNAME)
 
@@ -35,5 +35,5 @@ try:
         else:
             print("argument must be one of the followng: GPS, PA500, ADCP")
 except:
-    print("Error: check your syntax: python Run.py XXX")
+    print("Error: maybe check your syntax: python Run.py XXX")
     print("XXX must be one of the followng: GPS, PA500, ADCP")

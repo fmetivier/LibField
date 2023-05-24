@@ -7,6 +7,11 @@ import threading
 from datetime import datetime
 from bottle import route, run, template
 
+# globals
+ADCP_counter = 0
+GPS_counter = 0
+PA_counter = 0
+
 
 def connect(port="ttyACM0", baudrate=9600):
     """
