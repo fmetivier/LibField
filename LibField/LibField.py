@@ -48,23 +48,36 @@ def read_nmea(raw_line):
 
     return parsed_line
 
+def launch(instrument = None, port = None, t0=0, dirname='./'):
+	"""
+	launching function that depends only on isntrument type
+	"""
+	if instrument == 'Ublox':
+		get_GPS(port, t0, dirname)
+	elif instrument == 'ADCP':
+		get_ADCP(port, t0, dirname)
+	elif instrument == "PA500":
+		get_PA500(port, t0, dirname)
 
-def launch_GPS(port="/dev/ttyACM0", t0=0):
+def get_GPS(serial_port="/dev/ttyACM0", t0=0, dirname="./"):
     """connects to GPS
     get nmea sentence
     saves it to file for further processing
 
-    param: port: str, port to open
+    param: serial_port: str, port to open
     param: baudrate: int, communication rate in baud
     param: t0: int local start time
     """
 
-    gps = connect(port, 115000)
+    print(serial_port, type(serial_port), len(serial_port))
+    gps = connect(port=serial_port, baudrate=115000)
+    # gps = connect(port="/dev/ttyACM0",baudrate=115000)
+    mylog("GPS connected")
     global GPS_counter
 
     idx = 0
     collect = True
-    fname = "GPSout_%s.txt" % (str(t0))
+    fname = dirname + "GPSout_%s.txt" % (str(t0))
     f = open(fname, "w")
 
     while collect == True:
@@ -80,17 +93,20 @@ def launch_GPS(port="/dev/ttyACM0", t0=0):
     f.close()
 
 
-def launch_ADCP(port="/dev/ttyUSB0", t0=0, dirname="./"):
+def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
     """connects to ADCP
         sends initialisation and test commands
         store ensembles
 
-    param: port: str, port to open
+    param: serial_port: str, serial port to open
     param: baudrate: int, communication rate in bauds
     param: t0: int local start time
     """
 
-    ADCP = connect(port=port, baudrate=57600)
+    print(serial_port)
+    ADCP = connect(port=serial_port, baudrate=57600)
+    # ADCP = connect(port="/dev/ttyUSB0", baudrate=57600)
+    mylog("ADCP connected")
     global ADCP_counter
 
     # wake ADCP
@@ -139,16 +155,19 @@ def launch_ADCP(port="/dev/ttyUSB0", t0=0, dirname="./"):
     f.close()
 
 
-def launch_PA500(port="/dev/ttyUSB0", t0=0, dirname="./"):
+def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
     """Connects to a PA500 using USBserial connection
        collects nmea sentences
        saves them to file adding t-t0 timestamp and dateime.now()
 
-    param: port: string name of the port to open
+    param: serial_port: string name of the port to open
     param: t0: int local start time
     """
 
-    PA500 = connect("/dev/ttyUSB0")
+    print(serial_port)
+    PA500 = connect(port=serial_port)
+    # PA500 = connect(port="/dev/ttyUSB1")
+    mylog("PA500 connected")
     global PA_counter
 
     response = True
@@ -178,3 +197,10 @@ def launch_PA500(port="/dev/ttyUSB0", t0=0, dirname="./"):
                     bad_value += 1
             except:
                 print("Conversion problem. Probable incomplete serail reading")
+
+def mylog(sentence =""):
+
+    print(sentence)
+    # f = open("/home/pi/Documents/logfile.txt",a)
+    # f.write(str(datetime.now()) + ":" + sentence +"\n")
+    # f.close()
