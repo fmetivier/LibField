@@ -48,65 +48,70 @@ def read_nmea(raw_line):
 
     return parsed_line
 
-def launch(instrument = None, port = None, t0=0, dirname='./'):
-	"""
-	launching function that depends only on isntrument type
-	"""
-	if instrument == 'Ublox':
-		get_GPS(port, t0, dirname)
-	elif instrument == 'ADCP':
-		get_ADCP(port, t0, dirname)
-	elif instrument == "PA500":
-		get_PA500(port, t0, dirname)
+
+def launch(instrument=None, port=None, t0=0, dirname="./"):
+    """
+    launching function that depends only on instrument type
+    """
+    if instrument == "Ublox":
+        get_GPS(port, t0, dirname)
+    elif instrument == "ADCP":
+        get_ADCP(port, t0, dirname)
+    elif instrument == "PA500":
+        get_PA500(port, t0, dirname)
+
 
 def get_GPS(serial_port="/dev/ttyACM0", t0=0, dirname="./"):
-    """connects to GPS
-    get nmea sentence
-    saves it to file for further processing
+	"""connects to GPS
+	get nmea sentence
+	saves it to file for further processing
 
-    param: serial_port: str, port to open
-    param: baudrate: int, communication rate in baud
-    param: t0: int local start time
-    """
+	param: serial_port: str, port to open
+	param: baudrate: int, communication rate in baud
+	param: t0: int local start time
+	"""
 
-    print(serial_port, type(serial_port), len(serial_port))
-    gps = connect(port=serial_port, baudrate=115000)
-    # gps = connect(port="/dev/ttyACM0",baudrate=115000)
-    mylog("GPS connected")
-    global GPS_counter
+	print("GPS")
+	print(serial_port)
+	gps = connect(port=serial_port, baudrate=115000)
+	# gps = connect(port="/dev/ttyACM0",baudrate=115000)
+	print("GPS connected")
+	global GPS_counter
 
-    idx = 0
-    collect = True
-    fname = dirname + "GPSout_%s.txt" % (str(t0))
-    f = open(fname, "w")
+	idx = 0
+	collect = True
+	fname = dirname + "GPS_%s.txt" % (str(t0))
+	f = open(fname, "w")
 
-    while collect == True:
-        idx += 1
-        parsed_line = read_nmea(gps)
-        try:
-            with open(fname, "a") as f:
-                f.write(str(parsed_line) + "\n")
-            GPS_counter += 1
-            # print("GPS: %i" % counter)
-        except:
-            pass
-    f.close()
+	while collect == True:
+		idx += 1
+		parsed_line = read_nmea(gps)
+		try:
+			with open(fname, "a") as f:
+				f.write(str(parsed_line) + "\n")
+			GPS_counter += 1
+			# print("GPS: %i" % counter)
+		except:
+			pass
+	f.close()
 
 
 def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
     """connects to ADCP
-        sends initialisation and test commands
-        store ensembles
+        sends initialisation and test commands, stores results in lfname
+        sends configuration commands and starts pinging store ensembles in dfname
 
     param: serial_port: str, serial port to open
     param: baudrate: int, communication rate in bauds
     param: t0: int local start time
+    param: dirname: str directory path
     """
 
+    print('ADDCP')
     print(serial_port)
     ADCP = connect(port=serial_port, baudrate=57600)
     # ADCP = connect(port="/dev/ttyUSB0", baudrate=57600)
-    mylog("ADCP connected")
+    print("ADCP connected")
     global ADCP_counter
 
     # wake ADCP
@@ -149,10 +154,76 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
             if time.time() - it0 > 10:
                 response = False
 
-    dfname = dirname + "ADCP_data_%s.txt" % (str(t0))
+    dfname = dirname + "ADCP_%s.txt" % (str(t0))
     f = open(dfname, "w")
     f.write("#ADCP raw Data file")
     f.close()
+
+    """
+    ordres = [
+        b"CR1",
+        b"CF11210",
+        b"EA00000", Alignement de la direction par défaut
+        b"ED00000", Profondeur du transducteur par défaut
+        b"ES",  salinité  en parties pour mille
+        b"EX11111", transformation de coordonnées: coordonnées terrestres (Est-Nord), utilise les données de tilts, autorise une solution à trois transducteurs, autorise le bin mapping (pas compris j'ai pris le défaut)
+        b"EZ1111101", Sensor source : vitesse du son calculée, profondeur itoo, heading, pitch et roll internes aussi, salinité fournie (voir ES), température mesurée en interne.
+        b"WN030",   dépend de la profondeur à calculer
+        b"WP00045",  nombre de ping par ensemble
+        b"WS0050",  taille de cellulle 50 cm
+        b"TE00:00:00.00",  temps entre les ensembles default 01:00:00.00 ici je lui dis de démarrer la mesure immédiatement
+        b"TP00:00.00", delta t entre ping si 0 va aussi vite que possible.
+        b"PD8",
+        ajouter
+        b"WM1", Profiling mode 1 (défaut). Vérifier si on a pas intérêtà utiliser le 5 ou le 8
+        b"CK",
+        b"CS",
+    ]
+    """
+    ordres = [
+        b"CR1\r",
+        b"CF11010\r",
+        b"EA00000\r",
+        b"ED00000\r",
+        b"ES01\r",
+        b"EX11111\r",
+        b"EZ1111101\r",
+        b"WN010\r",
+        b"WP00045\r",
+        b"WS0005\r",
+        b"TE00:00:00.00\r",
+        b"TP00:00.00\r",
+        b"PD0\r",
+        b"WM1\r",
+        b"CK\r",
+        b"CS\r",
+    ]
+
+    ADCP.send_break(0.4)
+    for ordre in ordres:
+        ADCP.write(ordre)
+        print(ordre.decode())
+        time.sleep(0.5)
+
+    response = True
+    dt = 2
+    t=0
+    while response:
+        line=""
+        if ADCP.in_waiting > 0:
+            t=0
+            while ADCP.in_waiting > 0:
+                line += ADCP.read().decode("latin-1")
+            with open(dfname, "a") as f:
+                f.write(line + '\n')
+            ADCP_counter += 1
+        else:
+            t+=dt
+            print(t)
+        time.sleep(dt)
+
+        # if time.time() - it0 > 10:
+        #     response = False
 
 
 def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
@@ -164,43 +235,50 @@ def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
     param: t0: int local start time
     """
 
+    print("PA500")
     print(serial_port)
     PA500 = connect(port=serial_port)
     # PA500 = connect(port="/dev/ttyUSB1")
-    mylog("PA500 connected")
+    print("PA500 connected")
     global PA_counter
 
     response = True
-    oldT = t0
+    oldT = float(t0)
     bad_value = 0
     fname = dirname + "PA500_%s.txt" % (str(t0))
     f = open(fname, "w")
-    f.write("#t-t0, datetime.now, Depth (m)\n")
+    f.write("#t-t0, datetime.now, NMEA string\n")
     f.close()
-
+    dt = 0.13
+    raw_line=""
     while response:
-        if PA500.in_waiting > 0:
-            raw_line = PA500.read(42).decode("latin-1")
+        N = PA500.in_waiting
+        if N > 0:
+            c = PA500.read(1).decode("latin-1")
+            while c != '\n':
+                raw_line += c
+                c = PA500.read(1).decode("latin-1")
             t = time.time()
             now = datetime.now()
             try:
-                # only keep two records per seconds
-                #                if t - oldT > 0.5:
-                data = raw_line.split(",")
-                if data[4] == "M":
+                if t - oldT > 0.5:
                     with open(fname, "a") as f:
-                        f.write("%s,%s,%s\n" % (t - t0, now, data[3]))
+                        f.write("%s,%s,%s\n" % (t - float(t0), now, raw_line))
+                    # print(t-float(t0),now, raw_line)
                     PA_counter += 1
-                #                    oldT = t
-
-                else:
-                    bad_value += 1
+                    oldT = t
+                # else:
+                #     bad_value += 1
+                raw_line = ""
             except:
-                print("Conversion problem. Probable incomplete serail reading")
+                pass
+            raw_line=""
 
-def mylog(sentence =""):
 
-    print(sentence)
-    # f = open("/home/pi/Documents/logfile.txt",a)
-    # f.write(str(datetime.now()) + ":" + sentence +"\n")
-    # f.close()
+
+def mylog(sentence=""):
+
+    # ~ print(sentence)
+    f = open("logfile.txt",a)
+    f.write(str(datetime.now()) + ":" + sentence +"\n")
+    f.close()

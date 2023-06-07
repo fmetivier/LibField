@@ -1,54 +1,50 @@
-from bottle import route, run, template, request, Bottle, abort
+from bottle import route, view, run, request, Bottle, abort, redirect
 import time
-import threading
 
-# global variables
-ADCP_counter = 0
-GPS_counter = 0
-PA_counter = 0
+# import threading
+import os
 
 
-def inter_counters():
-    global ADCP_counter
-    global GPS_counter
-    global PA_counter
+def get_data(DIRNAME):
+    fname = DIRNAME + "last_t0.txt"
+    f = open(fname, "r")
+    t0 = f.readline().strip("\n")
 
-    while 1:
-        ADCP_counter += 10
-        GPS_counter += 2
-        PA_counter += 1
-        time.sleep(0.5)
+    res = []
+    flist = ["ADCP", "GPS", "PA500"]
+    for f in flist:
+        fname = DIRNAME + f + "_" + t0 + ".txt"
+        with open(fname, "r") as df:
+            lines = df.readlines()
+            res.append(lines[-1])
+
+    return res
 
 
 @route("/FieldPi")
+@view("page.tpl")
 def FieldPi():
-    global ADCP_counter
-    global GPS_counter
-    global PA_counter
-    page = """<html>
-    </header>
-    <meta http-equiv="refresh" content="2">
-    </header>
-    <body>
-    <h3>Data acquired</h3>
-    <p>
-    <ul>
-    <li> ADCP counter: %i
-    <li> GPS Counter: %i
-    <li> PA Counter: %i
-    </ul>
-    </p>
-    </body>
-    </html>
-    """ % (
-        ADCP_counter,
-        GPS_counter,
-        PA_counter,
-    )
-    return page
+
+    # target data directory
+    # DIRNAME = "/home/pi/Documents/Mayotte/Data/"
+    DIRNAME = "/home/metivier/Nextcloud/src/LibField/Data/"
+    res = get_data(DIRNAME)
+
+    return {"ADCP": res[0], "GPS": res[1], "PA": res[2]}
 
 
-counters = threading.Thread(target=inter_counters, args=(), daemon=True)
-counters.start()
+@route("/FieldPi", method="POST")
+def action():
+    Start = request.POST.get("Start")
+    Stop = request.POST.get("Stop")
 
-run(host="0.0.0.0", port=8080)
+    if Start is not None:
+        os.system("python3 /home/pi/Documents/LibField/Runscripts/Run_all.pi &")
+
+    if Stop is not None:
+        os.system("sudo killall python3 &")
+
+    redirect("/FieldPi")
+
+
+run(host="0.0.0.0")
