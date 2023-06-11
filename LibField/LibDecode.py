@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import datetime
 
 
 def Process_Ensemble(Line, LN, out=False):
@@ -18,7 +19,8 @@ def Process_Ensemble(Line, LN, out=False):
     #
 
     # Header
-    HeaderBegin = [1, 3, 5, 9, 11, 13]  # start bytes + 1 (made for C originally)
+    # start bytes + 1 (made for C originally)
+    HeaderBegin = [1, 3, 5, 9, 11, 13]
     HeaderList = ["HID", "DID", "BytesEns", "Spare", "DataTypes"]
 
     # Fix Leader
@@ -296,8 +298,6 @@ def Process_Ensemble(Line, LN, out=False):
 
     Data = {
         "VID": 2,
-        "NCells": Ncells,
-        "CellSize": CellSize,
         "CMID": 2,
         "ECIID": 2,
         "PCGID": 2,
@@ -310,7 +310,7 @@ def Process_Ensemble(Line, LN, out=False):
         # print("=======================")
 
         for i in range(len(HeaderBegin) - 1):
-            val = Line[HeaderBegin[i] - 1 : HeaderBegin[i + 1] - 1]
+            val = Line[HeaderBegin[i] - 1: HeaderBegin[i + 1] - 1]
             if len(val) == 2:
                 # dval = int(val, base=16)
                 dval = s16(val)
@@ -322,11 +322,11 @@ def Process_Ensemble(Line, LN, out=False):
 
         start = HeaderBegin[-1] - 1
         for i in range(Header["DataTypes"]):
-            val = Line[start : start + 4]
+            val = Line[start: start + 4]
             conv = "%s%s" % (val[2:], val[:2])
             # dval = int(conv, base=16)
             dval = s16(conv)
-            DataCode = Line[dval * 2 : dval * 2 + 4]
+            DataCode = Line[dval * 2: dval * 2 + 4]
             Header[DataName[DataCode]] = dval
             start += 4
         if out:
@@ -345,22 +345,32 @@ def Process_Ensemble(Line, LN, out=False):
         start = Header["Fix Leader"] * 2
 
         for i in range(len(FixLeaderList)):
-            val = Line[start : start + FixLeaderBytes[i] * 2]
+            converted_data = None
+            val = Line[start: start + FixLeaderBytes[i] * 2]
             if FixLeaderBytes[i] == 1:
-                # FixLeader[FixLeaderList[i]] = int(val, base=16)
-                FixLeader[FixLeaderList[i]] = s16(val)
+                converted_data = s16(val)
             elif FixLeaderBytes[i] == 2:
-                # FixLeader[FixLeaderList[i]] = int(val[2:] + val[:2], base=16)
-                FixLeader[FixLeaderList[i]] = s16(val[2:] + val[:2])
+                converted_data = s16(val[2:] + val[:2])
             else:
                 # decode each byte and assemble a composite value
-                sval = ""
+                converted_data = ""
                 for j in range(FixLeaderBytes[i]):
-                    # sval += str(int(val[j * 2 : (j + 1) * 2], base=16))
-                    sval += str(s16(val[j * 2 : (j + 1) * 2]))
-                FixLeader[FixLeaderList[i]] = sval
+                    converted_data += str(s16(val[j * 2: (j + 1) * 2]))
+
+            FixLeader[FixLeaderList[i]] = converted_data
+            if FixLeaderList[i] == "WF":
+                Data["Blank"] = converted_data
+            if FixLeaderList[i] == "WN":
+                Data["NCells"] = converted_data
+            if FixLeaderList[i] == "WS":
+                Data["CellSize"] = converted_data
 
             start += FixLeaderBytes[i] * 2
+
+        z = []
+        for i in range(int(Data["NCells"])):
+            z.append(int(Data["Blank"]) + int(Data["CellSize"]) * (i + 1))
+        # Data["Depth"] = z
 
         if out:
             print("=======================")
@@ -372,29 +382,32 @@ def Process_Ensemble(Line, LN, out=False):
         # print("=======================")
         # print("VARIABLE LEADER DATA")
         # print("=======================")
-        print("Number of bytes in Variable Leader:", sum(np.array(VariableLeaderBytes)))
+        print("Number of bytes in Variable Leader:",
+              sum(np.array(VariableLeaderBytes)))
         # position of the first byte of VARIABLE LEADER
         start = Header["Variable Leader"] * 2
 
         for i in range(len(VariableLeaderList)):
-            val = Line[start : start + VariableLeaderBytes[i] * 2]
+            val = Line[start: start + VariableLeaderBytes[i] * 2]
             if VariableLeaderBytes[i] == 1:
                 # VariableLeader[VariableLeaderList[i]] = int(val, base=16)
                 VariableLeader[VariableLeaderList[i]] = s16(val)
             elif VariableLeaderBytes[i] == 2:
                 if i > 0:
-                    # VariableLeader[VariableLeaderList[i]] = int(
-                    #     val[2:] + val[:2], base=16
-                    # )
-                    VariableLeader[VariableLeaderList[i]] = s16(val[2:] + val[:2])
-                else:
+                    VariableLeader[VariableLeaderList[i]] = s16(
+                        val[2:] + val[:2])
+                else:  # keep the header code as it is
                     VariableLeader[VariableLeaderList[i]] = val
             else:
                 # decode each byte and assemble a composite value
                 sval = ""
+                # print(val)
                 for j in range(VariableLeaderBytes[i]):
-                    # sval += str(int(val[j * 2 : (j + 1) * 2], base=16))
-                    sval += str(s16(val[j * 2 : (j + 1) * 2]))
+                    tmpval = s16(val[j * 2: (j + 1) * 2])
+                    if tmpval < 10:
+                        sval += "0" + str(tmpval)
+                    else:
+                        sval += str(tmpval)
                 VariableLeader[VariableLeaderList[i]] = sval
             start += VariableLeaderBytes[i] * 2
 
@@ -405,18 +418,14 @@ def Process_Ensemble(Line, LN, out=False):
             for key, val in VariableLeader.items():
                 print(key, val)
 
-        z = []
-        for i in range(Data["NCells"]):
-            z.append(+Data["CellSize"] * (i + 1))
-        Data["Depth"] = z
-
         # print("-----------------------")
         # print("VELOCITY DATA")
         # print("-----------------------")
         # position of the first byte
         start = Header["Velocity"] * 2
 
-        Data["Velocity"] = decode_ADCP_data(Line, start, Data["VID"], 2, Ncells)
+        Data["Velocity"] = decode_ADCP_data(
+            Line, start, Data["VID"], 2, Data["NCells"])
         # print(start)
 
         # print("-----------------------")
@@ -424,7 +433,9 @@ def Process_Ensemble(Line, LN, out=False):
         # print("-----------------------")
         # position of the first byte
         start = Header["Correlation Profile"] * 2
-        Data["CorrelMag"] = decode_ADCP_data(Line, start, Data["CMID"], 1, Ncells)
+        Data["CorrelMag"] = decode_ADCP_data(
+            Line, start, Data["CMID"], 1, Data["NCells"]
+        )
 
         # print("-----------------------")
         # print("ECHO INTENSITY PROFILE")
@@ -432,14 +443,18 @@ def Process_Ensemble(Line, LN, out=False):
         # position of the first byte of Echo Intensity Profile
         start = Header["Echo Intensity Profile"] * 2
 
-        Data["Echo Intensity"] = decode_ADCP_data(Line, start, Data["ECIID"], 1, Ncells)
+        Data["Echo Intensity"] = decode_ADCP_data(
+            Line, start, Data["ECIID"], 1, Data["NCells"]
+        )
 
         # print("-----------------------")
         # print("PERCENT MADE GOOD")
         # print("-----------------------")
         # position of the first byte of Percent Made Good
         start = Header["Percent Made Good"] * 2
-        Data["Percent Good"] = decode_ADCP_data(Line, start, Data["PCGID"], 1, Ncells)
+        Data["Percent Good"] = decode_ADCP_data(
+            Line, start, Data["PCGID"], 1, Data["NCells"]
+        )
 
         if out:
             print("=======================")
@@ -454,21 +469,23 @@ def Process_Ensemble(Line, LN, out=False):
         start = Header["Bottom Track"] * 2
 
         for i in range(len(BottomTrackList)):
-            val = Line[start : start + BottomTrackBytes[i] * 2]
+            val = Line[start: start + BottomTrackBytes[i] * 2]
             if BottomTrackBytes[i] == 1:
                 # BottomTrack[BottomTrackList[i]] = int(val, base=16)
                 BottomTrack[BottomTrackList[i]] = s16(val)
             elif BottomTrackBytes[i] == 2:
                 if i > 0:
-                    # BottomTrack[BottomTrackList[i]] = int(val[2:] + val[:2], base=16)
                     BottomTrack[BottomTrackList[i]] = s16(val[2:] + val[:2])
                 else:
                     BottomTrack[BottomTrackList[i]] = val
             else:
                 sval = ""
                 for j in range(BottomTrackBytes[i]):
-                    # sval += str(int(val[j * 2 : (j + 1) * 2], base=16))
-                    sval += str(s16(val[j * 2 : (j + 1) * 2]))
+                    tmpval = s16(val[j * 2: (j + 1) * 2])
+                    if tmpval < 10:
+                        sval += "0" + str(tmpval)
+                    else:
+                        sval += str(tmpval)
                 BottomTrack[BottomTrackList[i]] = sval
 
             start += BottomTrackBytes[i] * 2
@@ -501,12 +518,12 @@ def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
     :return: data_list, decoded data
     :rtype: list
     """
-    val = Line[start : start + id_num_bytes * 2]
+    val = Line[start: start + id_num_bytes * 2]
     data_list = []
     for i in range(NCells):
         d = []
         for j in range(4):
-            val = Line[start : start + data_bytes * 2]
+            val = Line[start: start + data_bytes * 2]
             if data_bytes == 2:
                 hex = val[2:] + val[:2]
             else:
@@ -517,7 +534,7 @@ def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
     return data_list
 
 
-def read_ADCP(t0=0, dirname="./"):
+def read_ADCP(t0=0, dirname="./", out=False):
     """reads and ADCP data file and translates the content into readable values
 
     :param t0: int, common starting time used for filename
@@ -536,8 +553,10 @@ def read_ADCP(t0=0, dirname="./"):
     #
     # fname = "/home/metivier/Nextcloud/src/LibField/Data/sampleBassin.txt"
     fname = dirname + "ADCP_" + str(t0) + ".txt"
+    # print(fname)
     f = open(fname, "r")
     Lines = f.readlines()
+    # print(Lines)
     f.close()
 
     # line number
@@ -545,23 +564,27 @@ def read_ADCP(t0=0, dirname="./"):
     BadEnsemble = 0
     TotEnsemble = 0
     for Line in Lines:
-        if Line[0:4] == "7F7F":
-            # print(LN)
-            TotEnsemble += 1
-            # checksum the ensemble
-            Line = Line.strip("\n")
-            Checksum1 = 0
-            for i in range(int(len(Line[:-4]) / 2)):
-                Checksum1 += int(Line[i * 2 : i * 2 + 2], base=16)
-            Checksum2 = Line[-2] + Line[-1] + Line[-4] + Line[-3]
-            Checksum2 = int(Checksum2, base=16)
-            if Checksum1 == Checksum2:  # if checksum passed decode ensemble
-                # print("Checksum ok:", Checksum1)
-                Process_Ensemble(Line, LN, out=True)
-            else:
-                BadEnsemble += 1
-                print("Bad checksum")
-        LN += 1
+        if ',' in Line:
+            data = Line.split(',')
+            Ensemble = data[1]
+            if data[1][0:4] == "7F7F":
+                # print(LN)
+                TotEnsemble += 1
+                # checksum the ensemble
+                Ensemble = data[1].strip("\n")
+                Checksum1 = 0
+                for i in range(int(len(Ensemble[:-4]) / 2)):
+                    Checksum1 += int(Ensemble[i * 2: i * 2 + 2], base=16)
+                Checksum2 = Ensemble[-2] + Ensemble[-1] + \
+                    Ensemble[-4] + Ensemble[-3]
+                Checksum2 = int(Checksum2, base=16)
+                if Checksum1 == Checksum2:  # if checksum passed decode ensemble
+                    # print("Checksum ok:", Checksum1)
+                    Process_Ensemble(Ensemble, LN, out=out)
+                else:
+                    BadEnsemble += 1
+                    print("Bad checksum")
+            LN += 1
     print("Number of ensembles", TotEnsemble)
     print("Number of bad ensembles", BadEnsemble)
     # print("Ncells:", Ncells)
@@ -580,11 +603,31 @@ def s16(value):
     return -(value & 0x8000) | (value & 0x7FFF)
 
 
+def decode_PA(sentence):
+    """decode a PA sentence and returns depth and date
+
+    :param sentence: nmea string
+    :return: list of values
+    :rtype: list
+    """
+
+    try:
+        data = sentence.strip("\n").split(",")
+        t = data[1]
+        for i in range(len(data)):
+            if "M" in data[i]:
+                z = data[i - 1]
+        return [t, z]
+    except:
+        return [str(datetime.now()), "bad sentence"]
+
+
 if __name__ == "__main__":
 
     dirname = "/home/metivier/Nextcloud/src/LibField/Data/"
-    t0 = 1685956508  # 1685719068
-    read_ADCP(t0, dirname)
+    with open(dirname+'last_t0.txt') as f:
+        t0 = f.readline().strip('\n')
 
-    print(int("8000", base=16))
-    print(s16("8000"))
+    print(t0)
+    # t0 = 1686137037  # 1685956508  # 1685719068
+    read_ADCP(t0, dirname, True)

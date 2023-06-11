@@ -5,19 +5,23 @@
 <meta http-equiv="refresh" content="10">
 </header>
 <body>
-<h3>Data acquired</h3>
-<p>
-<ul>
-<li> ADCP counter: {{ADCP}}
-<li> GPS Counter: {{GPS}}
-<li> PA Counter: {{PA}}
-</ul>
+<h2>Data</h2>
+
+<h3> ADCP </h3>
+{{ADCP}}
+
+<h3>GPS</h3>
+{{GPS}}
+
+<h3> PA 500</h3>
+
+{{PA}}
 </p>
-<p>
+<!-- <p>
 <form action="/FieldPi", method="POST">
     <td><input type ="submit" name="Start" value="Start"></td>
     <td><input type ="submit" name="Stop" value="Stop"></td>
 </form>
-</p>
+</p> -->
 </body>
 </html>

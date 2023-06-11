@@ -34,13 +34,17 @@ def connect(port="ttyACM0", baudrate=9600):
     return PortComm
 
 
-def read_nmea(raw_line):
+def read_nmea(instrument):
     """
-    reads a line from an instrument and parse it using pynmea2 library
+    reads a line from a GPS and parse it using pynmea2 library
     returns the parsed line
+
+    :param instrument: gps serial connection object
+    :return: parsed line
     """
 
     try:
+        raw_line = instrument.readline()
         decoded_line = raw_line.decode("utf-8").replace("\n", "").replace("\r", "")
         parsed_line = pynmea2.parse(decoded_line)
     except:
@@ -62,38 +66,39 @@ def launch(instrument=None, port=None, t0=0, dirname="./"):
 
 
 def get_GPS(serial_port="/dev/ttyACM0", t0=0, dirname="./"):
-	"""connects to GPS
-	get nmea sentence
-	saves it to file for further processing
+    """connects to GPS
+    get nmea sentence
+    saves it to file for further processing
 
-	param: serial_port: str, port to open
-	param: baudrate: int, communication rate in baud
-	param: t0: int local start time
-	"""
+    param: serial_port: str, port to open
+    param: baudrate: int, communication rate in baud
+    param: t0: int local start time
+    """
 
-	print("GPS")
-	print(serial_port)
-	gps = connect(port=serial_port, baudrate=115000)
-	# gps = connect(port="/dev/ttyACM0",baudrate=115000)
-	print("GPS connected")
-	global GPS_counter
+    print("GPS")
+    print(serial_port)
+    gps = connect(port=serial_port, baudrate=115000)
+    # gps = connect(port="/dev/ttyACM0",baudrate=115000)
+    print("GPS connected")
+    global GPS_counter
 
-	idx = 0
-	collect = True
-	fname = dirname + "GPS_%s.txt" % (str(t0))
-	f = open(fname, "w")
+    idx = 0
+    collect = True
+    fname = dirname + "GPS_%s.txt" % (str(t0))
+    f = open(fname, "w")
 
-	while collect == True:
-		idx += 1
-		parsed_line = read_nmea(gps)
-		try:
-			with open(fname, "a") as f:
-				f.write(str(parsed_line) + "\n")
-			GPS_counter += 1
-			# print("GPS: %i" % counter)
-		except:
-			pass
-	f.close()
+    while collect == True:
+        idx += 1
+        parsed_line = read_nmea(gps)
+        try:
+            if parsed_line != "-1":
+                with open(fname, "a") as f:
+                    f.write(str(parsed_line) + "\n")
+                GPS_counter += 1
+            # print("GPS: %i" % counter)
+        except:
+            pass
+    f.close()
 
 
 def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
@@ -107,7 +112,7 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
     param: dirname: str directory path
     """
 
-    print('ADDCP')
+    print("ADDCP")
     print(serial_port)
     ADCP = connect(port=serial_port, baudrate=57600)
     # ADCP = connect(port="/dev/ttyUSB0", baudrate=57600)
@@ -206,24 +211,16 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
         time.sleep(0.5)
 
     response = True
-    dt = 2
-    t=0
+    dt = 0.1
     while response:
-        line=""
+        line = "\n" + str(datetime.now()) + ","
         if ADCP.in_waiting > 0:
-            t=0
             while ADCP.in_waiting > 0:
                 line += ADCP.read().decode("latin-1")
             with open(dfname, "a") as f:
-                f.write(line + '\n')
+                f.write(line)
             ADCP_counter += 1
-        else:
-            t+=dt
-            print(t)
         time.sleep(dt)
-
-        # if time.time() - it0 > 10:
-        #     response = False
 
 
 def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
@@ -250,12 +247,12 @@ def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
     f.write("#t-t0, datetime.now, NMEA string\n")
     f.close()
     dt = 0.13
-    raw_line=""
+    raw_line = ""
     while response:
         N = PA500.in_waiting
         if N > 0:
             c = PA500.read(1).decode("latin-1")
-            while c != '\n':
+            while c != "\n":
                 raw_line += c
                 c = PA500.read(1).decode("latin-1")
             t = time.time()
@@ -272,13 +269,12 @@ def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
                 raw_line = ""
             except:
                 pass
-            raw_line=""
-
+            raw_line = ""
 
 
 def mylog(sentence=""):
 
     # ~ print(sentence)
-    f = open("logfile.txt",a)
-    f.write(str(datetime.now()) + ":" + sentence +"\n")
+    f = open("logfile.txt", "a")
+    f.write(str(datetime.now()) + ":" + sentence + "\n")
     f.close()

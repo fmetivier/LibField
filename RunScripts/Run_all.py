@@ -27,5 +27,5 @@ for instrument in ["Ublox", "PA500", "ADCP"]:
     print(command)
     os.system(command)
 
-#finally launch website
+# finally launch website
 # os.system("python3 /home/pi/Documents/LibField/LibField/WebLib.py &")

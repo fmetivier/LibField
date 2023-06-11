@@ -1,5 +1,6 @@
 from bottle import route, view, run, request, Bottle, abort, redirect
 import time
+import LibDecode as LD
 
 # import threading
 import os
@@ -16,13 +17,14 @@ def get_data(DIRNAME):
         fname = DIRNAME + f + "_" + t0 + ".txt"
         with open(fname, "r") as df:
             lines = df.readlines()
-            res.append(lines[-1])
+        res.append(lines[-1])
 
     return res
 
 
 @route("/FieldPi")
-@view("page.tpl")
+# @view("/home/pi/Documents/LibField/LibField/page.tpl")
+@view("/home/metivier/Nextcloud/src/LibField/LibField/page.tpl")
 def FieldPi():
 
     # target data directory
@@ -30,7 +32,9 @@ def FieldPi():
     DIRNAME = "/home/metivier/Nextcloud/src/LibField/Data/"
     res = get_data(DIRNAME)
 
-    return {"ADCP": res[0], "GPS": res[1], "PA": res[2]}
+    Pval = LD.decode_PA(res[2])
+
+    return {"ADCP": res[0], "GPS": res[1], "PA": Pval}
 
 
 @route("/FieldPi", method="POST")
