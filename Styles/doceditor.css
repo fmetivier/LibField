@@ -1,0 +1,41 @@
+/* EDITEUR */
+#editor {
+	display: block;
+}
+
+textarea { 
+	width: 80%; 
+	height:90%;
+	border: 1px solid #333; 
+	padding: 4px; 
+	float:left;
+	margin-right: 20px;
+}
+
+#filelist select {
+	width: 15%;
+	height: 20%;
+}
+#uploaddiv {
+	margin-left: 210px;
+	margin-top: 0px;
+	color: white;
+	background-color:red;
+	position: absolute;
+	padding: 5px,
+}
+
+#log_info {
+	position: fixed;
+	top: 0;
+	left: 50%;
+	width:100px;
+	height:15px;
+	text-align:center;
+}
+#log_info p{
+	background-color:red;
+	color:white;
+	text-transform:uppercase;
+}
+

@@ -1,9 +1,10 @@
 import sys
 import numpy as np
 import datetime
+import pynmea2
 
 
-def Process_Ensemble(Line, LN, out=False):
+def Process_Ensemble(Line, LN=1, out=False):
     """Decodes an ADCP Ensemble
     - Header, Fix Leader, Variable Leader and Bottom Track are decoded here
     because they have unique series of parameters
@@ -293,7 +294,6 @@ def Process_Ensemble(Line, LN, out=False):
     Header = {}
     FixLeader = {}
     VariableLeader = {}
-    DataHeader = {}
     BottomTrack = {}
 
     Data = {
@@ -312,8 +312,10 @@ def Process_Ensemble(Line, LN, out=False):
         for i in range(len(HeaderBegin) - 1):
             val = Line[HeaderBegin[i] - 1: HeaderBegin[i + 1] - 1]
             if len(val) == 2:
-                # dval = int(val, base=16)
-                dval = s16(val)
+                if i > 1:
+                    dval = s16(val)
+                else:
+                    dval = val
             elif len(val) == 4:
                 conv = "%s%s" % (val[2:], val[:2])
                 # dval = int(conv, base=16)
@@ -350,7 +352,10 @@ def Process_Ensemble(Line, LN, out=False):
             if FixLeaderBytes[i] == 1:
                 converted_data = s16(val)
             elif FixLeaderBytes[i] == 2:
-                converted_data = s16(val[2:] + val[:2])
+                if i > 0:
+                    converted_data = s16(val[2:] + val[:2])
+                else:
+                    converted_data = val
             else:
                 # decode each byte and assemble a composite value
                 converted_data = ""
@@ -370,7 +375,7 @@ def Process_Ensemble(Line, LN, out=False):
         z = []
         for i in range(int(Data["NCells"])):
             z.append(int(Data["Blank"]) + int(Data["CellSize"]) * (i + 1))
-        # Data["Depth"] = z
+        Data["Depth"] = z
 
         if out:
             print("=======================")
@@ -500,6 +505,9 @@ def Process_Ensemble(Line, LN, out=False):
     except:
         print("!!! Line %i not decoded" % (LN))
 
+    # return dictionnaries
+    return Header, FixLeader, VariableLeader, Data, BottomTrack
+
 
 def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
     """Reads Data portion from ADCP ensemble
@@ -515,7 +523,7 @@ def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
     :param data_bytes: int, number of bytes per data value
     :param Ncells: int, number of cells per ensemble
 
-    :return: data_list, decoded data
+    :returns: decoded data
     :rtype: list
     """
     val = Line[start: start + id_num_bytes * 2]
@@ -532,6 +540,27 @@ def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
             start += data_bytes * 2
         data_list.append(d)
     return data_list
+
+
+def checksum(Ensemble):
+    """Performs checsum of Ensemble
+
+    :param Ensemble: Hex-ascii string to be decoded
+    :returns: true if checksum succeeds, False if checksum fails
+
+    """
+
+    Checksum1 = 0
+    for i in range(int(len(Ensemble[:-4]) / 2)):
+        Checksum1 += int(Ensemble[i * 2: i * 2 + 2], base=16)
+    Checksum2 = Ensemble[-2] + Ensemble[-1] + \
+        Ensemble[-4] + Ensemble[-3]
+    Checksum2 = int(Checksum2, base=16)
+
+    if Checksum1 == Checksum2:
+        return True
+    else:
+        return False
 
 
 def read_ADCP(t0=0, dirname="./", out=False):
@@ -551,12 +580,11 @@ def read_ADCP(t0=0, dirname="./", out=False):
     # filename to read
     # read all in one
     #
-    # fname = "/home/metivier/Nextcloud/src/LibField/Data/sampleBassin.txt"
     fname = dirname + "ADCP_" + str(t0) + ".txt"
-    # print(fname)
+
     f = open(fname, "r")
     Lines = f.readlines()
-    # print(Lines)
+
     f.close()
 
     # line number
@@ -568,18 +596,10 @@ def read_ADCP(t0=0, dirname="./", out=False):
             data = Line.split(',')
             Ensemble = data[1]
             if data[1][0:4] == "7F7F":
-                # print(LN)
                 TotEnsemble += 1
                 # checksum the ensemble
                 Ensemble = data[1].strip("\n")
-                Checksum1 = 0
-                for i in range(int(len(Ensemble[:-4]) / 2)):
-                    Checksum1 += int(Ensemble[i * 2: i * 2 + 2], base=16)
-                Checksum2 = Ensemble[-2] + Ensemble[-1] + \
-                    Ensemble[-4] + Ensemble[-3]
-                Checksum2 = int(Checksum2, base=16)
-                if Checksum1 == Checksum2:  # if checksum passed decode ensemble
-                    # print("Checksum ok:", Checksum1)
+                if checksum(Ensemble):  # if checksum passed decode ensemble
                     Process_Ensemble(Ensemble, LN, out=out)
                 else:
                     BadEnsemble += 1
@@ -587,27 +607,45 @@ def read_ADCP(t0=0, dirname="./", out=False):
             LN += 1
     print("Number of ensembles", TotEnsemble)
     print("Number of bad ensembles", BadEnsemble)
-    # print("Ncells:", Ncells)
-    # print("CellSize (cm):", CellSize)
 
 
 def s16(value):
-    """returns signed int from hex
+    """Returns signed int from hex
 
     adapted from
     https://stackoverflow.com/questions/24563786/conversion-from-hex-to-signed-dec-in-python
 
     :param value: hex string to convert
+    :returns: converted signed integer value
+    :rtype: int
     """
     value = int(value, base=16)
     return -(value & 0x8000) | (value & 0x7FFF)
 
 
+def decode_parsed_GPS(sentence):
+    """Decodes sentence and returns dic with fields and values
+
+    :param sentence: parsed sentence to recode
+    :returns: parsed GPS data dictionnary
+    :rtype: dic
+    """
+
+    GPS_data_dic = {}
+    if sentence != "-1":
+        sentence = pynmea2.parse(sentence)
+        for field in sentence.fields:
+            value = getattr(sentence, field[1])
+            GPS_data_dic[field[1]] = value
+
+    return GPS_data_dic
+
+
 def decode_PA(sentence):
-    """decode a PA sentence and returns depth and date
+    """Decodes a PA sentence and returns depth and date
 
     :param sentence: nmea string
-    :return: list of values
+    :returns: list of values
     :rtype: list
     """
 

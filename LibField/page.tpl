@@ -1,27 +1,57 @@
 <!doctype html>
 <!-- page.tpl -->
 <html>
-</header>
+<header>
+<style>
+% for line in css:
+  {{line}}
+% end
+</style>
 <meta http-equiv="refresh" content="10">
 </header>
 <body>
-<h2>Data</h2>
+<div id="container">
+<div id="content">
+<h1>Data</h1>
 
-<h3> ADCP </h3>
-{{ADCP}}
+<h2> ADCP data dictionnary</h2>
+<table>
+<tr><th> Field </th><th> value</th></tr>
+% for key,val in ADCP.items():
+<tr>
+  <td> {{key}} </td><td>{{val}}</td>
+</tr>
+% end
+</table>
 
-<h3>GPS</h3>
-{{GPS}}
+<h2>GPS</h2>
+<table>
+<tr><th> Field </th><th> Value</th></tr>
+% for key,val in GPS.items():
+<tr>
+  <td> {{key}} </td><td>{{val}}</td>
+</tr>
+% end
+</table>
 
-<h3> PA 500</h3>
 
-{{PA}}
+<h2> PA 500</h2>
+% t = PA[0]
+% z = PA[1]
+<table>
+  <tr><th> Time </th><th> Depth (m)</th></tr>
+  <tr>
+    <td> {{t}} </td><td>{{z}}</td>
+  </tr>
+</table>
 </p>
-<!-- <p>
+<p>
 <form action="/FieldPi", method="POST">
     <td><input type ="submit" name="Start" value="Start"></td>
     <td><input type ="submit" name="Stop" value="Stop"></td>
 </form>
-</p> -->
+</p>
+</div>
+</div>
 </body>
 </html>

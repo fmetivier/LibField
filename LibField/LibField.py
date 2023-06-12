@@ -45,7 +45,8 @@ def read_nmea(instrument):
 
     try:
         raw_line = instrument.readline()
-        decoded_line = raw_line.decode("utf-8").replace("\n", "").replace("\r", "")
+        decoded_line = raw_line.decode(
+            "utf-8").replace("\n", "").replace("\r", "")
         parsed_line = pynmea2.parse(decoded_line)
     except:
         parsed_line = -1
@@ -70,6 +71,8 @@ def get_GPS(serial_port="/dev/ttyACM0", t0=0, dirname="./"):
     get nmea sentence
     saves it to file for further processing
 
+    TODO do not parse. Just dump the line.
+
     param: serial_port: str, port to open
     param: baudrate: int, communication rate in baud
     param: t0: int local start time
@@ -91,7 +94,7 @@ def get_GPS(serial_port="/dev/ttyACM0", t0=0, dirname="./"):
         idx += 1
         parsed_line = read_nmea(gps)
         try:
-            if parsed_line != "-1":
+            if parsed_line != "-1\n":
                 with open(fname, "a") as f:
                     f.write(str(parsed_line) + "\n")
                 GPS_counter += 1

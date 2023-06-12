@@ -17,7 +17,14 @@ def get_data(DIRNAME):
         fname = DIRNAME + f + "_" + t0 + ".txt"
         with open(fname, "r") as df:
             lines = df.readlines()
-        res.append(lines[-1])
+
+        if f == "GPS":
+            count = -1
+            while "GNGGA" not in lines[count]:
+                count -= 1
+            res.append(lines[count])
+        else:
+            res.append(lines[-1])
 
     return res
 
@@ -30,11 +37,34 @@ def FieldPi():
     # target data directory
     # DIRNAME = "/home/pi/Documents/Mayotte/Data/"
     DIRNAME = "/home/metivier/Nextcloud/src/LibField/Data/"
+
     res = get_data(DIRNAME)
 
     Pval = LD.decode_PA(res[2])
+    GPSdic = LD.decode_parsed_GPS(res[1])
 
-    return {"ADCP": res[0], "GPS": res[1], "PA": Pval}
+    data = res[0].split(',')
+    Ensemble = data[1]
+    print(data[1][0:4])
+    if data[1][0:4] == "7F7F":
+        # checksum the ensemble
+        print("ok")
+        Ensemble = data[1].strip("\n")
+        if LD.checksum(Ensemble):  # if checksum passed decode ensemble
+            ADCPdic_list = LD.Process_Ensemble(Ensemble)
+        else:
+            print("Bad checksum")
+            ADCPdic_list = [{}, {}, {}, {}, {}]
+
+        ADCPdic = ADCPdic_list[4]
+    else:
+        ADCPdic = {"bof": "bof"}
+
+    # get style file
+    with open("../Styles/basestyle.css", "r") as f:
+        css = f.readlines()
+
+    return {"css": css, "ADCP": ADCPdic, "GPS": GPSdic, "PA": Pval}
 
 
 @route("/FieldPi", method="POST")
