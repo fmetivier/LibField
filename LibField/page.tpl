@@ -45,10 +45,10 @@
   </tr>
 </table>
 </p>
-<p>
+<p style="text-align:center;">
 <form action="/FieldPi", method="POST">
-    <td><input type ="submit" name="Start" value="Start"></td>
-    <td><input type ="submit" name="Stop" value="Stop"></td>
+    <td><input type ="submit" name="Start" value="Start" style="width:45%;height:50px;margin-right:9%;background-color:#004D9B;color:white;"></td>
+    <td><input type ="submit" name="Stop" value="Stop" style="width:45%;height:50px;background-color:#F13C4F;color:white;"></td>
 </form>
 </p>
 </div>

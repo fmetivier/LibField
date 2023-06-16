@@ -5,7 +5,7 @@ LibField library
 Introduction
 ============
 
-LibField is library composed of a set of python functions that helps to handle Field instruments. NMEA or serial messages are read and dumped into a corresponding file for further processing. This library was intended to be used with a Raspberry pi  to collect data autonomously and post logging information on the web. It can also be used from a laptop.
+LibField is library composed of a set of python functions to handle Field instruments. NMEA or serial messages are read and dumped into a corresponding file for further processing. This library was intended to be used with a Raspberry pi  to collect data autonomously and post logging information on the web. It can also be used from a laptop.
 
 
 A present it handles connection with
@@ -31,4 +31,10 @@ Runscripts
 
 * Run_as_threads.py launches all instrument acquisitions as threads
 * Run_one.py is to be used on a command line terminal to launch one instrument
-* Run_all.py wraps three Run_one commands using os.system() instruction.
+* Run_all.py wraps three Run_one commands using os.system() instruction
+
+
+
+Dependancies:
+=============
+pynmea2 and gpxpy are installed during setup, but you also need SeriaDeviceRetriever that must be downloiaded from the github reposit: https://github.com/odevauchelle/SerialDeviceRetriever.

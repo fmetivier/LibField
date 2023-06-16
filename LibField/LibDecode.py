@@ -4,6 +4,31 @@ import datetime
 import pynmea2
 
 
+class ADCPEnsemble:
+
+    def __init__(self, Header, FixLeader, VariableLeader, Data, BottomTrack):
+        self.Header = Header
+        self.FixLeader = FixLeader
+        self.VariableLeader = VariableLeader
+        self.Data = Data
+        self.BottomTrack = BottomTrack
+
+    def V(self, comp=1):
+        """returns the velocity along axis a
+        depending on the acquisition procedure this can be a beam radial velocity or an earth referenced velocity.
+
+        :param comp: velocity component to return
+        """
+        V_array = np.transpose(np.array(self.Data["Velocity"]))
+        return (V_array[comp])
+
+    def avg_V(self, type='Cell'):
+        if type == "Cell":
+            pass
+        elif type == "Profile":
+            pass
+
+
 def Process_Ensemble(Line, LN=1, out=False):
     """Decodes an ADCP Ensemble
     - Header, Fix Leader, Variable Leader and Bottom Track are decoded here
@@ -15,12 +40,16 @@ def Process_Ensemble(Line, LN=1, out=False):
 
     """
 
+    ######################################################
     #
     # Lists and dics used to decode the ensemble
     #
+    ######################################################
 
     # Header
-    # start bytes + 1 (made for C originally)
+    #
+    # !!! start bytes + 1 (made for C originally)
+    #
     HeaderBegin = [1, 3, 5, 9, 11, 13]
     HeaderList = ["HID", "DID", "BytesEns", "Spare", "DataTypes"]
 
@@ -303,11 +332,15 @@ def Process_Ensemble(Line, LN=1, out=False):
         "PCGID": 2,
     }
 
+    ######################################################
+    # Decoding
+    ######################################################
+
     try:
 
-        # print("=======================")
-        # print("HEADER")
-        # print("=======================")
+        ###########################
+        # HEADER
+        ###########################
 
         for i in range(len(HeaderBegin) - 1):
             val = Line[HeaderBegin[i] - 1: HeaderBegin[i + 1] - 1]
@@ -338,9 +371,9 @@ def Process_Ensemble(Line, LN=1, out=False):
             for key, val in Header.items():
                 print(key, val)
 
-        # print("=======================")
-        # print("FIX LEADER")
-        # print("=======================")
+        ###########################
+        # FIX LEADER
+        ###########################
         print("Number of bytes in Fix Leader:", sum(np.array(FixLeaderBytes)))
 
         # position of the first byte of FIX LEADER
@@ -384,9 +417,9 @@ def Process_Ensemble(Line, LN=1, out=False):
             for key, val in FixLeader.items():
                 print(key, val)
 
-        # print("=======================")
-        # print("VARIABLE LEADER DATA")
-        # print("=======================")
+        ###########################
+        # VARIABLE LEADER DATA
+        ###########################
         print("Number of bytes in Variable Leader:",
               sum(np.array(VariableLeaderBytes)))
         # position of the first byte of VARIABLE LEADER
@@ -423,28 +456,27 @@ def Process_Ensemble(Line, LN=1, out=False):
             for key, val in VariableLeader.items():
                 print(key, val)
 
-        # print("-----------------------")
-        # print("VELOCITY DATA")
-        # print("-----------------------")
+        ###########################
+        # VELOCITY DATA
+        ###########################
         # position of the first byte
         start = Header["Velocity"] * 2
 
         Data["Velocity"] = decode_ADCP_data(
             Line, start, Data["VID"], 2, Data["NCells"])
-        # print(start)
 
-        # print("-----------------------")
-        # print("CORRELATION MAGNITUDE")
-        # print("-----------------------")
+        ###########################
+        # CORRELATION MAGNITUDE
+        ###########################
         # position of the first byte
         start = Header["Correlation Profile"] * 2
         Data["CorrelMag"] = decode_ADCP_data(
             Line, start, Data["CMID"], 1, Data["NCells"]
         )
 
-        # print("-----------------------")
-        # print("ECHO INTENSITY PROFILE")
-        # print("-----------------------")
+        ###########################
+        # ECHO INTENSITY PROFILE
+        ###########################
         # position of the first byte of Echo Intensity Profile
         start = Header["Echo Intensity Profile"] * 2
 
@@ -452,9 +484,9 @@ def Process_Ensemble(Line, LN=1, out=False):
             Line, start, Data["ECIID"], 1, Data["NCells"]
         )
 
-        # print("-----------------------")
-        # print("PERCENT MADE GOOD")
-        # print("-----------------------")
+        ###########################
+        # PERCENT MADE GOOD
+        ###########################
         # position of the first byte of Percent Made Good
         start = Header["Percent Made Good"] * 2
         Data["Percent Good"] = decode_ADCP_data(
@@ -468,9 +500,9 @@ def Process_Ensemble(Line, LN=1, out=False):
             for key, val in Data.items():
                 print(key, val)
 
-        # print("=======================")
-        # print("BOTTOM TRACK")
-        # print("=======================")
+        ###########################
+        # BOTTOM TRACK
+        ###########################
         start = Header["Bottom Track"] * 2
 
         for i in range(len(BottomTrackList)):
@@ -505,7 +537,9 @@ def Process_Ensemble(Line, LN=1, out=False):
     except:
         print("!!! Line %i not decoded" % (LN))
 
+    ###########################
     # return dictionnaries
+    ###########################
     return Header, FixLeader, VariableLeader, Data, BottomTrack
 
 
@@ -619,6 +653,7 @@ def s16(value):
     :returns: converted signed integer value
     :rtype: int
     """
+
     value = int(value, base=16)
     return -(value & 0x8000) | (value & 0x7FFF)
 
@@ -662,10 +697,13 @@ def decode_PA(sentence):
 
 if __name__ == "__main__":
 
+    ######################################################
+    # reads the code of the last acquisition and decodes
+    ######################################################
+
     dirname = "/home/metivier/Nextcloud/src/LibField/Data/"
     with open(dirname+'last_t0.txt') as f:
         t0 = f.readline().strip('\n')
 
     print(t0)
-    # t0 = 1686137037  # 1685956508  # 1685719068
     read_ADCP(t0, dirname, True)
