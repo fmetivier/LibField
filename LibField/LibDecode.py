@@ -2,6 +2,8 @@ import sys
 import numpy as np
 import datetime
 import pynmea2
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 class ADCPEnsemble:
@@ -13,14 +15,95 @@ class ADCPEnsemble:
         self.Data = Data
         self.BottomTrack = BottomTrack
 
-    def V(self, comp=1):
-        """returns the velocity along axis a
+        # process ADCP ensemble
+        # transform velocities
+        self.VADCP = self.Beam2xyz()
+        self.VGeo = self.ADCP2Geog()
+
+    def TransposeVel(self, V=None):
+        """returns the velocity along component comp
         depending on the acquisition procedure this can be a beam radial velocity or an earth referenced velocity.
 
         :param comp: velocity component to return
         """
+        if V:
+            return np.transpose(np.array(V))
+        else:
+            return None
+
+    def Beam2xyz(self):
+        """Transform beam velocities XYZ velocities
+
+        checks for cells with
+        uses all four beams to calculate vz.
+        nor error calculation at that point
+
+        returns z, vx,vy,vz
+        """
+
+        VADCP = []
+        BA = 20*np.pi/180
+        for v, pg, z in zip(self.Data["Velocity"], self.Data["Percent Good"], self.Data["Depth"]):
+            if np.sum(pg) == 400 and -32768 not in v:
+                vx = (v[0]-v[1])/(2*np.sin(BA))
+                vy = (v[3]-v[2])/(2*np.sin(BA))
+                vz = np.sum(v)/(4*np.cos(BA))
+                e = (v[0]+v[1]-v[2]-v[3])/(2*np.sqrt(2)*np.sin(BA))
+                VADCP.append([z, vx, vy, vz, e])
+            else:
+                pass
+        return VADCP
+
+    def ADCP2Geog(self):
+        """Transform velocity referenced to boat by applying heading rotation"""
+        tr = self.VariableLeader["ER"] * np.pi / 18000
+        tp = np.arctan(
+            np.tan(self.VariableLeader["EP"] * np.pi / 18000)*np.cos(tr))
+        th = self.VariableLeader["EH"] * np.pi / 18000
+
+        TR = np.array([[np.cos(tr), 0, np.sin(tr)], [
+                      0, 1, 0], [-np.sin(tr), 0, np.cos(tr)]])
+
+        TP = np.array([[1, 0, 0], [0, np.cos(tp), np.sin(tp)],
+                      [0, -np.sin(tp), np.cos(tp)]])
+
+        TH = np.array([[np.cos(th), np.sin(th), 0],
+                      [-np.sin(th), np.cos(th), 0], [0, 0, 1]])
+
+        M = np.dot(TH, np.dot(TP, TR))
+
+        VGeo = []
+        for d in self.VADCP:
+            v = np.array([d[1], d[2], d[3]])
+            vg = np.dot(M, v)
+            VGeo.append([d[0], vg[0], vg[1], vg[2]])
+
+        return VGeo
+
+    def Geog2earth(self, tt='GPS'):
+        """Transform Geographical velocity in an earth reference by substracting boat velcity vector depending on tt value  applies bottom tracking using the echosounder or the BT values or uses RTK GPS values
+
+        :param tt: str GPS or BT or PA
+            GPS: perform RTK GPS calculation of boat velocity
+            BT: perform BT velocity measurement of boat using ADCP only
+            PA: perform BT velocity measurement of boat using echosounder to find the bottom cell.
+        """
+        pass
+
+    def GV(self, comp=1):
+        """returns the good velocity along component comp
+        depending on the acquisition procedure this can be a beam radial velocity or an earth referenced velocity.
+
+        :param comp: velocity component to return
+        """
+
         V_array = np.transpose(np.array(self.Data["Velocity"]))
-        return (V_array[comp])
+        G_array = np.transpose(np.array(self.Data["Percent Good"]))
+        V = V_array[comp]
+        G = G_array[comp]
+        V[V == -32768] = 0
+        V[G <= 0] = 0
+        return (V)
 
     def avg_V(self, type='Cell'):
         if type == "Cell":
@@ -560,7 +643,9 @@ def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
     :returns: decoded data
     :rtype: list
     """
+    # read data id and skip it
     val = Line[start: start + id_num_bytes * 2]
+
     data_list = []
     for i in range(NCells):
         d = []
@@ -609,6 +694,7 @@ def read_ADCP(t0=0, dirname="./", out=False):
     # variables to read
     #
     BadEnsemble = 0
+    Ensemble_list = []
 
     #
     # filename to read
@@ -634,13 +720,15 @@ def read_ADCP(t0=0, dirname="./", out=False):
                 # checksum the ensemble
                 Ensemble = data[1].strip("\n")
                 if checksum(Ensemble):  # if checksum passed decode ensemble
-                    Process_Ensemble(Ensemble, LN, out=out)
+                    h, fl, vl, da, bt = Process_Ensemble(Ensemble, LN, out=out)
+                    Ensemble_list.append(ADCPEnsemble(h, fl, vl, da, bt))
                 else:
                     BadEnsemble += 1
                     print("Bad checksum")
             LN += 1
     print("Number of ensembles", TotEnsemble)
     print("Number of bad ensembles", BadEnsemble)
+    return (Ensemble_list)
 
 
 def s16(value):
@@ -706,4 +794,10 @@ if __name__ == "__main__":
         t0 = f.readline().strip('\n')
 
     print(t0)
-    read_ADCP(t0, dirname, True)
+    ProfList = read_ADCP(t0, dirname, True)
+    P0 = ProfList[0]
+
+    print(P0.Data["Velocity"])
+
+    print(P0.VADCP)
+    print(P0.VGeo)

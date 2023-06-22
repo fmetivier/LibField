@@ -115,7 +115,7 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
     param: dirname: str directory path
     """
 
-    print("ADDCP")
+    print("ADCP")
     print(serial_port)
     ADCP = connect(port=serial_port, baudrate=57600)
     # ADCP = connect(port="/dev/ttyUSB0", baudrate=57600)
@@ -194,10 +194,10 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
         b"EA00000\r",
         b"ED00000\r",
         b"ES01\r",
-        b"EX11111\r",
+        b"EX00000\r",
         b"EZ1111101\r",
         b"WN010\r",
-        b"WP00045\r",
+        b"WP00001\r",
         b"WS0005\r",
         b"TE00:00:00.00\r",
         b"TP00:00.00\r",

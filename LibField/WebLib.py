@@ -36,8 +36,8 @@ def get_data(DIRNAME):
 
 
 @route("/FieldPi")
-# @view("/home/pi/Documents/LibField/LibField/page.tpl")
-@view("/home/metivier/Nextcloud/src/LibField/LibField/page.tpl")
+@view("/home/pi/Documents/LibField/LibField/page.tpl")
+#@view("/home/metivier/Nextcloud/src/LibField/LibField/page.tpl")
 def FieldPi():
     """main web page
 
@@ -73,7 +73,7 @@ def FieldPi():
                 print("Bad checksum")
                 ADCPdic_list = [{}, {}, {}, {}, {}]
 
-            ADCPdic = ADCPdic_list[4]
+            ADCPdic = ADCPdic_list[3]
         else:
             ADCPdic = {"bof": "bof"}
         return_dic = {"css": css, "ADCP": ADCPdic, "GPS": GPSdic, "PA": Pval}
@@ -100,4 +100,4 @@ def action():
 
     redirect("/FieldPi")
 
-    run(host="0.0.0.0")
+run(host="0.0.0.0")

@@ -88,6 +88,7 @@ ENV/
 
 #latex stuff
 *.pdf
+*.PDF
 *.bbl
 *.aux
 *.gz
