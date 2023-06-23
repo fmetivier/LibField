@@ -36,8 +36,8 @@ def get_data(DIRNAME):
 
 
 @route("/FieldPi")
-@view("/home/pi/Documents/LibField/LibField/page.tpl")
-#@view("/home/metivier/Nextcloud/src/LibField/LibField/page.tpl")
+# @view("/home/pi/Documents/LibField/LibField/page.tpl")
+@view("/home/metivier/Nextcloud/src/LibField/LibField/page.tpl")
 def FieldPi():
     """main web page
 
@@ -45,13 +45,13 @@ def FieldPi():
     """
 
     # target data directory
-    DIRNAME = "/home/pi/Documents/Mayotte/Data/"
-    # DIRNAME = "/home/metivier/Nextcloud/src/LibField/Data/"
+    # DIRNAME = "/home/pi/Documents/Mayotte/Data/"
+    DIRNAME = "/home/metivier/Nextcloud/src/LibField/Data/"
 
     return_dic = {}
     # get style file
-    # with open("/home/metivier/Nextcloud/src/LibField/Styles/basestyle.css", "r") as f:
-    with open("/home/pi/Documents/LibField/Styles/basestyle.css", "r") as f:
+    with open("/home/metivier/Nextcloud/src/LibField/Styles/basestyle.css", "r") as f:
+        # with open("/home/pi/Documents/LibField/Styles/basestyle.css", "r") as f:
         css = f.readlines()
 
     try:
@@ -99,5 +99,6 @@ def action():
         os.system("sudo killall python3 &")
 
     redirect("/FieldPi")
+
 
 run(host="0.0.0.0")

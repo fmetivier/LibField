@@ -7,8 +7,19 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 class ADCPEnsemble:
+    """Class to process ADCP ensembles
+    """
 
     def __init__(self, Header, FixLeader, VariableLeader, Data, BottomTrack):
+        """Class initialisation
+
+        :param Header: dic containing header data
+        :param FixLeader: dic containing fix leader data
+        :param VariableLeader: dic containing variable leader data
+        :param Data: value for key, value in variable}: dic containing velocity and intensity data
+        :param BottomTrack: dic containing bottom track data
+
+        """
         self.Header = Header
         self.FixLeader = FixLeader
         self.VariableLeader = VariableLeader
@@ -19,6 +30,22 @@ class ADCPEnsemble:
         # transform velocities
         self.VADCP = self.Beam2xyz()
         self.VGeo = self.ADCP2Geog()
+
+    def SoundVel(T=0.0, S=0.0, D=0.0):
+        """ returns the spead of sound for a given temperature, salinity and depth
+
+        :param T: float, temperature in degrees C
+        :param S: float, Salinity in parts per thousands  (or g/l)
+        :param D: float, depth in meters
+
+        :returns: vs calculated speed of sound
+        :rtype: float
+        """
+
+        vs = 1449.2 + 4.6*T - 0.055*T**2 + 0.00029 * \
+            T**3 + (1.34-0.01*T)*(S-35) + 0.016*D
+
+        return vs
 
     def TransposeVel(self, V=None):
         """returns the velocity along component comp
@@ -687,7 +714,10 @@ def read_ADCP(t0=0, dirname="./", out=False):
 
     :param t0: int, common starting time used for filename
     :param dirname: str, data storage directory
+    :param out: boolean, print out results if True
 
+    :returns: list of ADCPEnsemble
+    :rtype: list
     """
 
     #
@@ -783,6 +813,43 @@ def decode_PA(sentence):
         return [str(datetime.now()), "bad sentence"]
 
 
+def read_GPS(t0=0, dirname='./', out=True):
+    """reads GPS data file extracts GNGGA sentences into a list
+
+    :param t0: int, common starting time used for filename
+    :param dirname: str, data storage directory
+    :param out: boolean, print out results if True
+
+    :returns: res, list of GPS coordinates and time
+    :rtype: list
+
+    """
+    fname = dirname + "ADCP_" + str(t0) + ".txt"
+
+    # f = open(fname, "r")
+    f = open("/home/metivier/Nextcloud/src/GPS/LibGPS/GPSout.txt", "r")
+    Lines = f.readlines()
+    f.close()
+
+    res = []
+    for line in Lines:
+        if line[0:6] == '$GNGGA':
+            GPS = decode_parsed_GPS(line.strip('\n'))
+            lat = float(GPS["lat"])/100
+            if GPS["lat_dir"] == 'S':
+                lat *= -1
+            lon = float(GPS["lon"])/100
+            if GPS["lon_dir"] == 'W':
+                lon *= -1
+            el = float(GPS["altitude"])
+            res.append([GPS["timestamp"], lat, lon, el])
+    if out:
+        for r in res:
+            print(r)
+
+    return res
+
+
 if __name__ == "__main__":
 
     ######################################################
@@ -801,3 +868,5 @@ if __name__ == "__main__":
 
     print(P0.VADCP)
     print(P0.VGeo)
+
+    # read_GPS()
