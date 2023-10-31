@@ -179,8 +179,8 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
         b"WN030",   dépend de la profondeur à calculer
         b"WP00045",  nombre de ping par ensemble
         b"WS0050",  taille de cellulle 50 cm
-        b"TE00:00:00.00",  temps entre les ensembles default 01:00:00.00 ici je lui dis de démarrer la mesure immédiatement
-        b"TP00:00.00", delta t entre ping si 0 va aussi vite que possible.
+        b"TE00:00:00.50",  temps entre les ensembles default 01:00:00.00 ici je lui dis de démarrer la mesure immédiatement
+        b"TP00:00.05", delta t entre ping si 0 va aussi vite que possible.
         b"PD8",
         ajouter
         b"WM1", Profiling mode 1 (défaut). Vérifier si on a pas intérêtà utiliser le 5 ou le 8
@@ -200,7 +200,7 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
         b"WP00001\r",
         b"WS0005\r",
         b"TE00:00:00.00\r",
-        b"TP00:00.00\r",
+        b"TP00:00.50\r",
         b"PD0\r",
         b"WM1\r",
         b"CK\r",
@@ -224,6 +224,124 @@ def get_ADCP(serial_port="/dev/ttyUSB1", t0=0, dirname="./"):
                 f.write(line)
             ADCP_counter += 1
         time.sleep(dt)
+
+
+def test_ADCP(serial_port="/dev/ttyUSB0"):
+    """connects to ADCP
+
+
+    param: serial_port: str, serial port to open
+    param: baudrate: int, communication rate in bauds
+    param: t0: int local start time
+    param: dirname: str directory path
+    """
+
+    print("ADCP")
+    print(serial_port)
+    ADCP = connect(port=serial_port, baudrate=57600)
+
+    print("ADCP connected")
+    global ADCP_counter
+
+    # wake ADCP
+    ADCP.send_break(0.4)
+    response = True
+
+    line = ""
+    while response:
+        if ADCP.in_waiting > 0:
+            raw_line = ADCP.read(ADCP.in_waiting).decode("latin-1")
+            line += raw_line
+        else:
+            if ADCP_counter >= 10:
+                response = False
+            else:
+                ADCP_counter += 1
+                time.sleep(0.2)
+    print(line)
+
+    # perform tests
+    ordres = [
+        b"ps0\r",
+        b"ps3\r",
+        b"pc2\r",
+    ]
+
+    for ordre in ordres:
+        ADCP.write(ordre)
+        response = True
+        it0 = time.time()  # internal t0
+        st = ""
+        while response:
+            if ADCP.in_waiting > 0:
+                line = ADCP.read(ADCP.in_waiting).decode("latin-1")
+                st += line
+                ADCP_counter += 1
+            if time.time() - it0 > 10:
+                response = False
+
+        print(st)
+
+    """
+    ordres = [
+        b"CR1",
+        b"CF11210",
+        b"EA00000", Alignement de la direction par défaut
+        b"ED00000", Profondeur du transducteur par défaut
+        b"ES",  salinité  en parties pour mille
+        b"EX11111", transformation de coordonnées: coordonnées terrestres (Est-Nord), utilise les données de tilts, autorise une solution à trois transducteurs, autorise le bin mapping (pas compris j'ai pris le défaut)
+        b"EZ1111101", Sensor source : vitesse du son calculée, profondeur itoo, heading, pitch et roll internes aussi, salinité fournie (voir ES), température mesurée en interne.
+        b"WN030",   dépend de la profondeur à calculer
+        b"WP00045",  nombre de ping par ensemble
+        b"WS0050",  taille de cellulle 50 cm
+        b"TE00:00:00.50",  temps entre les ensembles default 01:00:00.00 ici je lui dis de démarrer la mesure immédiatement
+        b"TP00:00.05", delta t entre ping si 0 va aussi vite que possible.
+        b"PD8",
+        ajouter
+        b"WM1", Profiling mode 1 (défaut). Vérifier si on a pas intérêtà utiliser le 5 ou le 8
+        b"CK",
+        b"CS",
+    ]
+    """
+    ordres = [
+        b"CR1\r",
+        b"CF11010\r",
+        b"EA00000\r",
+        b"ED00000\r",
+        b"ES01\r",
+        b"EX00000\r",
+        b"EZ1111101\r",
+        b"WN010\r",
+        b"WP00001\r",
+        b"WS0005\r",
+        b"TE00:00:00.00\r",
+        b"TP00:00.50\r",
+        b"PD0\r",
+        b"WM1\r",
+        b"CK\r",
+        b"CS\r",
+    ]
+
+    ADCP.send_break(0.4)
+    for ordre in ordres:
+        ADCP.write(ordre)
+        print(ordre.decode())
+        time.sleep(0.5)
+
+    response = True
+    dt = 0.1
+    count = 0
+    while response:
+        count += 1
+        line = "\n" + str(datetime.now()) + ","
+        if ADCP.in_waiting > 0:
+            while ADCP.in_waiting > 0:
+                line += ADCP.read().decode("latin-1")
+            print(line)
+            ADCP_counter += 1
+        time.sleep(dt)
+        if count == 100:
+            response = False
 
 
 def get_PA500(serial_port="/dev/ttyUSB0", t0=0, dirname="./"):
@@ -281,3 +399,7 @@ def mylog(sentence=""):
     f = open("logfile.txt", "a")
     f.write(str(datetime.now()) + ":" + sentence + "\n")
     f.close()
+
+
+if __name__ == '__main__':
+    test_ADCP()

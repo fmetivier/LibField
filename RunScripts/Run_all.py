@@ -3,8 +3,8 @@ import sys
 import time
 
 
-# sys.path.append("/home/metivier/Nextcloud/src/LibField/")
-sys.path.append("/home/pi/Documents/LibField/")
+sys.path.append("/home/metivier/Nextcloud/src/LibField/")
+# sys.path.append("/home/pi/Documents/LibField/")
 
 t0 = int(time.time())
 

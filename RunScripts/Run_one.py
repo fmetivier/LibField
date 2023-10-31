@@ -1,12 +1,13 @@
-import time
 import sys
-import os
-
 sys.path.append("/home/pi/Documents/LibField/")
 sys.path.append("/home/pi/Documents/SerialDeviceRetriever/")
+sys.path.append("/home/metivier/Nextcloud/src/LibField/")
+sys.path.append("/home/metivier/Nextcloud/src/SerialDeviceRetriever/")
 
-import SerialDeviceRetriever as sdr
 import LibField as LF
+import SerialDeviceRetriever as sdr
+import time
+import os
 
 
 ld = sdr.list_devices()

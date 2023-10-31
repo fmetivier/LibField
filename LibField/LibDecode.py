@@ -1,16 +1,29 @@
 import sys
 import numpy as np
-import datetime
+from datetime import time, datetime, timedelta
 import pynmea2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import pandas as pd
+import cartopy.crs as ccrs
+import cartopy.feature as ft
+from owslib.wmts import WebMapTileService
+import folium
+# from pykml import parser
+import pandas as pd
+import cartopy.io.img_tiles as cimgt
+import matplotlib.cm as cm
+from matplotlib.colors import rgb2hex
+import glob
 
 
 class ADCPEnsemble:
     """Class to process ADCP ensembles
+
+    TODO use corrected sound velocity
     """
 
-    def __init__(self, Header, FixLeader, VariableLeader, Data, BottomTrack):
+    def __init__(self, Header, FixLeader, VariableLeader, Data, BottomTrack, ac_time=0, salinity=0):
         """Class initialisation
 
         :param Header: dic containing header data
@@ -18,6 +31,7 @@ class ADCPEnsemble:
         :param VariableLeader: dic containing variable leader data
         :param Data: value for key, value in variable}: dic containing velocity and intensity data
         :param BottomTrack: dic containing bottom track data
+        :param ac_time: float, timestamp of ensemble acquisition
 
         """
         self.Header = Header
@@ -25,11 +39,35 @@ class ADCPEnsemble:
         self.VariableLeader = VariableLeader
         self.Data = Data
         self.BottomTrack = BottomTrack
+        self.ac_time = ac_time
+        self.salinity = salinity
 
         # process ADCP ensemble
         # transform velocities
-        self.VADCP = self.Beam2xyz()
-        self.VGeo = self.ADCP2Geog()
+        if self.FixLeader["EX"] == 0:
+            self.Beam2xyz()
+            self.ADCP2Geog()
+        else:
+            # print(self.FixLeader["EX"])
+            self.FilterVel()
+            print(self.VGeo)
+
+    def synchronize_with_gps(self, idir='./', fname='boat_trajectory.txt'):
+        """synchronizes the ensemble with the boat trajectory
+        retrieves position and boat velocity  that can be used for plotting and velocity processing
+
+        :param idir: str, directory to look for the boat file
+        :param fname: str, boat trajectory file
+
+        """
+
+        bdat = np.loadtxt(idir+fname, delimiter=',', skiprows=1)
+
+        val = np.min(np.abs(bdat[:, 0]-self.ac_time))
+        a = np.argwhere(np.abs(bdat[:, 0]-self.ac_time) == val)
+
+        self.gps_info = bdat[a[0], :][0]
+        return (self.gps_info)
 
     def SoundVel(T=0.0, S=0.0, D=0.0):
         """ returns the spead of sound for a given temperature, salinity and depth
@@ -79,7 +117,28 @@ class ADCPEnsemble:
                 VADCP.append([z, vx, vy, vz, e])
             else:
                 pass
+
+        self.VADCP = VADCP
         return VADCP
+
+    def FilterVel(self):
+        """filter good velocities
+
+        checks for cells with four good beams
+
+        returns z, vx,vy,vz
+        """
+        VGeo = []
+        for v, pg, z in zip(self.Data["Velocity"], self.Data["Percent Good"], self.Data["Depth"]):
+            if -32768 not in v:
+                vx = v[0]
+                vy = v[1]
+                vz = v[2]
+                e = v[3]
+                VGeo.append([z, vx, vy, vz, e])
+            else:
+                pass
+        self.VGeo = VGeo
 
     def ADCP2Geog(self):
         """Transform velocity referenced to boat by applying heading rotation"""
@@ -97,14 +156,13 @@ class ADCPEnsemble:
         TH = np.array([[np.cos(th), np.sin(th), 0],
                       [-np.sin(th), np.cos(th), 0], [0, 0, 1]])
 
-        M = np.dot(TH, np.dot(TP, TR))
-
         VGeo = []
         for d in self.VADCP:
             v = np.array([d[1], d[2], d[3]])
-            vg = np.dot(M, v)
+            vg = np.dot(TH, np.dot(TP, np.dot(TR, v)))
             VGeo.append([d[0], vg[0], vg[1], vg[2]])
 
+        self.VGeo = VGeo
         return VGeo
 
     def Geog2earth(self, tt='GPS'):
@@ -484,7 +542,7 @@ def Process_Ensemble(Line, LN=1, out=False):
         ###########################
         # FIX LEADER
         ###########################
-        print("Number of bytes in Fix Leader:", sum(np.array(FixLeaderBytes)))
+        # print("Number of bytes in Fix Leader:", sum(np.array(FixLeaderBytes)))
 
         # position of the first byte of FIX LEADER
         start = Header["Fix Leader"] * 2
@@ -530,8 +588,8 @@ def Process_Ensemble(Line, LN=1, out=False):
         ###########################
         # VARIABLE LEADER DATA
         ###########################
-        print("Number of bytes in Variable Leader:",
-              sum(np.array(VariableLeaderBytes)))
+        # print("Number of bytes in Variable Leader:",
+        #       sum(np.array(VariableLeaderBytes)))
         # position of the first byte of VARIABLE LEADER
         start = Header["Variable Leader"] * 2
 
@@ -672,6 +730,7 @@ def decode_ADCP_data(Line, start, id_num_bytes, data_bytes, NCells):
     """
     # read data id and skip it
     val = Line[start: start + id_num_bytes * 2]
+    start += id_num_bytes*2
 
     data_list = []
     for i in range(NCells):
@@ -731,6 +790,7 @@ def read_ADCP(t0=0, dirname="./", out=False):
     # read all in one
     #
     fname = dirname + "ADCP_" + str(t0) + ".txt"
+    print("Decoding %s..." % (fname))
 
     f = open(fname, "r")
     Lines = f.readlines()
@@ -744,6 +804,17 @@ def read_ADCP(t0=0, dirname="./", out=False):
     for Line in Lines:
         if ',' in Line:
             data = Line.split(',')
+            # get time
+
+            # get t and transform it to UTC time
+            t = datetime.fromisoformat(data[0])
+            if t0 == 1687858603 or t.day == 28:
+                t -= timedelta(hours=3)
+            else:
+                t -= timedelta(hours=2)
+            t = t.timestamp()
+
+            # get ensemble
             Ensemble = data[1]
             if data[1][0:4] == "7F7F":
                 TotEnsemble += 1
@@ -751,10 +822,10 @@ def read_ADCP(t0=0, dirname="./", out=False):
                 Ensemble = data[1].strip("\n")
                 if checksum(Ensemble):  # if checksum passed decode ensemble
                     h, fl, vl, da, bt = Process_Ensemble(Ensemble, LN, out=out)
-                    Ensemble_list.append(ADCPEnsemble(h, fl, vl, da, bt))
+                    Ensemble_list.append(ADCPEnsemble(h, fl, vl, da, bt, t))
                 else:
                     BadEnsemble += 1
-                    print("Bad checksum")
+                    # print("Bad checksum")
             LN += 1
     print("Number of ensembles", TotEnsemble)
     print("Number of bad ensembles", BadEnsemble)
@@ -804,16 +875,16 @@ def decode_PA(sentence):
 
     try:
         data = sentence.strip("\n").split(",")
-        t = data[1]
+        t = datetime.fromisoformat(data[1])
         for i in range(len(data)):
             if "M" in data[i]:
                 z = data[i - 1]
-        return [t, z]
+        return [t, float(z)]
     except:
-        return [str(datetime.now()), "bad sentence"]
+        return "bad"
 
 
-def read_GPS(t0=0, dirname='./', out=True):
+def read_GPS(t0=0, dirname='./', out=False):
     """reads GPS data file extracts GNGGA sentences into a list
 
     :param t0: int, common starting time used for filename
@@ -824,49 +895,63 @@ def read_GPS(t0=0, dirname='./', out=True):
     :rtype: list
 
     """
-    fname = dirname + "ADCP_" + str(t0) + ".txt"
 
-    # f = open(fname, "r")
-    f = open("/home/metivier/Nextcloud/src/GPS/LibGPS/GPSout.txt", "r")
+    fname = dirname + "GPS_" + str(t0) + ".txt"
+    print("processing %s..." % (fname))
+    f = open(fname, "r")
+    # f = open("/home/metivier/Nextcloud/src/GPS/LibGPS/GPSout.txt", "r")
     Lines = f.readlines()
     f.close()
 
     res = []
     for line in Lines:
+        # print(line)
         if line[0:6] == '$GNGGA':
-            GPS = decode_parsed_GPS(line.strip('\n'))
-            lat = float(GPS["lat"])/100
-            if GPS["lat_dir"] == 'S':
-                lat *= -1
-            lon = float(GPS["lon"])/100
-            if GPS["lon_dir"] == 'W':
-                lon *= -1
-            el = float(GPS["altitude"])
-            res.append([GPS["timestamp"], lat, lon, el])
-    if out:
-        for r in res:
-            print(r)
-
+            try:
+                GPS = decode_parsed_GPS(line.strip('\n'))
+                l = GPS["lon"]
+                lon = float(l[0:3]) + float(l[3:])/60
+                if GPS["lon_dir"] == 'W':
+                    lon *= -1
+                # print("lon", lon)
+                l = GPS["lat"]
+                lat = float(l[0:2]) + float(l[2:])/60
+                if GPS["lat_dir"] == 'S':
+                    lat *= -1
+                # print("lat", lat)
+                el = float(GPS["altitude"])
+                res.append([GPS["timestamp"], lat, lon, el])
+            except:
+                # print(GPS)
+                pass
+        if out:
+            for r in res:
+                print(r)
     return res
 
 
-if __name__ == "__main__":
+def read_PA(t0=0, dirname='./', out=False):
+    """reads PA data file
 
-    ######################################################
-    # reads the code of the last acquisition and decodes
-    ######################################################
+    :param t0: int, common starting time used for filename
+    :param dirname: str, data storage directory
+    :param out: boolean, print out results if True
 
-    dirname = "/home/metivier/Nextcloud/src/LibField/Data/"
-    with open(dirname+'last_t0.txt') as f:
-        t0 = f.readline().strip('\n')
+    :returns: res, list of PA depth
+    :rtype: list
 
-    print(t0)
-    ProfList = read_ADCP(t0, dirname, True)
-    P0 = ProfList[0]
+    """
+    fname = dirname + "PA500_" + str(t0) + ".txt"
+    print("processing %s..." % (fname))
 
-    print(P0.Data["Velocity"])
+    f = open(fname, "r")
+    Lines = f.readlines()
+    Lines = Lines[1:]
+    f.close()
 
-    print(P0.VADCP)
-    print(P0.VGeo)
-
-    # read_GPS()
+    res = []
+    for line in Lines:
+        r = decode_PA(line.strip('\n'))
+        if r != 'bad':
+            res.append(r)
+    return res

@@ -1,0 +1,54 @@
+#ADCP test log
+P£¡50700801B0600803F020
+[BREAK Wakeup A]
+WorkHorse Rio Grande Broadband ADCP Version 10.17
+Teledyne RD Instruments (c) 1996-2009
+All Rights Reserved.
+>ps0
+  Instrument S/N:  3051
+       Frequency:  1228800 HZ
+   Configuration:  4 BEAM, JANUS
+      Beam Angle:  20 DEGREES
+    Beam Pattern:  CONVEX 
+     Orientation:  DOWN
+       Sensor(s):  HEADING  TILT 1  TILT 2  TEMPERATURE
+Temp Sens Offset:  -0.18 degrees C
+
+    CPU Firmware:  10.17 [0]
+   Boot Code Ver:  Required:  1.13   Actual:  1.13
+    DEMOD #1 Ver:  ad48, Type:  1f
+    DEMOD #2 Ver:  ad48, Type:  1f
+    PWRTIMG  Ver:  85d3, Type:   7
+
+Board Serial Number Data:
+   32  00 00 02 C9 29 98  09 DSP727-2001-02F
+   8A  00 00 02 FA A6 9C  09 CPU727-2000-00H
+   2C  00 00 02 C7 72 3E  09 REC727-1000-02A
+   67  00 00 03 01 8F 5D  09 PIO727-3008-02A
+>ps3
+Beam Width:   3.7 degrees
+
+Beam     Elevation     Azimuth
+  1         -69.94      269.95
+  2         -70.02       89.95
+  3         -69.91        0.04
+  4         -69.97      180.05
+
+Beam Directional Matrix (Down):
+  0.3432    0.0003    0.9393    0.2418  
+ -0.3417   -0.0003    0.9398    0.2428  
+ -0.0003   -0.3435    0.9391   -0.2421  
+  0.0003    0.3426    0.9395   -0.2427  
+
+Instrument Transformation Matrix (Down):    Q14:
+  1.4619   -1.4584   -0.0001   -0.0026       23951  -23894      -2     -42  
+ -0.0004    0.0020   -1.4585    1.4564          -7      33  -23896   23861  
+  0.2656    0.2667    0.2657    0.2664        4351    4370    4354    4365  
+  1.0292    1.0336   -1.0303   -1.0330       16862   16934  -16881  -16924  
+Beam Angle Corrections Are Loaded.
+>pc2
+
+Press any key to quit sensor display ...
+
+Heading   Pitch    Roll   Up/Down    Attitude Temp   Ambient Temp   PRESSURE
+184.76ø  -0.17ø   0.62ø    Down         28.49øC        25.42øC         0.0 kPa184.77ø  -0.16ø   0.61ø    Down         28.50øC        25.41øC         0.0 kPa184.77ø  -0.15ø   0.63ø    Down         28.50øC        25.42øC         0.0 kPa184.88ø  -0.16ø   0.62ø    Down         28.49øC        25.42øC         0.0 kPa184.89ø  -0.16ø   0.61ø    Down         28.49øC        25.41øC         0.0 kPa184.95ø  -0.17ø   0.63ø    Down         28.47øC        25.43øC         0.0 kPa185.03ø  -0.16ø   0.63ø    Down         28.50øC        25.41øC         0.0 kPa185.14ø  -0.16ø   0.61ø    Down         28.49øC        25.42øC         0.0 kPa185.09ø  -0.16ø   0.62ø    Down         28.48øC        25.43øC         0.0 kPa185.14ø  -0.17ø   0.63ø    Down         28.50øC        25.41øC         0.0 kPa185.15ø  -0.18ø   0.61ø    Down         28.48øC        25.42øC         0.0 kPa185.21ø  -0.16ø   0.62ø    Down         28.48øC        25.42øC         0.0 kPa185.14ø  -0.17ø   0.61ø    Down         28.48øC        25.43øC         0.0 kPa185.08ø  -0.16ø   0.62ø    Down         28.47øC        25.42øC         0.0 kPa

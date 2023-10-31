@@ -1,0 +1,28 @@
+#ADCP test log
+
+[BREAK Wakeup A]
+WorkHorse Rio Grande Broadband ADCP Version 10.17
+Teledyne RD Instruments (c) 1996-2009
+All Rights Reserved.
+>ps0
+  Instrument S/N:  3051
+       Frequency:  1228800 HZ
+   Configuration:  4 BEAM, JANUS
+      Beam Angle:  20 DEGREES
+    Beam Pattern:  CONVEX 
+     Orientation:  DOWN
+       Sensor(s):  HEADING  TILT 1  TILT 2  TEMPERATURE
+Temp Sens Offset:  -0.18 degrees C
+
+    CPU Firmware:  10.17 [0]
+   Boot Code Ver:  Required:  1.13   Actual:  1.13
+    DEMOD #1 Ver:  ad48, Type:  1f
+    DEMOD #2 Ver:  ad48, Type:  1f
+    PWRTIMG  Ver:  85d3, Type:   7
+
+Board Serial Number Data:
+   32  00 00 02 C9 29 98  09 DSP727-2001-02F
+   8A  00 00 02 FA A6 9C  09 CPU727-2000-00H
+   2C  00 00 02 C7 72 3E  09 REC727-1000-02A
+   67  00 00 03 01 8F 5D  09 PIO727-3008-02A
+>
