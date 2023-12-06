@@ -157,6 +157,42 @@ def map(data, oname='out.html', map_type='gps'):
 
     macarte.save(oname)
 
+def ccmap(data, oname='out.pdf', map_type='gps'):
+    """folium maps of measurments
+    maps the tracks and if given other variables as coloured points
+
+    :param gps: list of gps points
+    :param oname: str output file name
+    :param map_type: str data type sent: 'bathy','gps','adcp_vz'
+    """
+
+    # my_crs = ccrs.PlateCarree(45.288)
+    my_crs=ccrs.UTM(zone=38,southern_hemisphere=True)
+
+    tile_data = cimgt.GoogleTiles(style='satellite')
+    fig = plt.figure(figsize=(20, 40))
+    ax = fig.add_subplot(111, projection=my_crs)
+    ax.set_extent((45.284, 45.295, -12.765, -12.775))
+
+    ax.add_image(tile_data, 19)
+
+
+    if map_type == 'adcp_vz':
+        cmap = cm.get_cmap('Reds')
+        data = np.array(data)
+        ax.scatter(data[:,2], data[:,1], s=10, c=data[:,3], cmap=cmap, transform=ccrs.PlateCarree(), alpha=0.5 )
+        print(np.min(data[:,3]), np.max(data[:,3]))
+        # ax.plot(data[:,2], data[:,1], 'o', transform=ccrs.PlateCarree() )
+
+    ax.gridlines(
+        draw_labels=True,
+        x_inline=False,
+        y_inline=False,
+        color="gray",
+        linestyle="dashed",
+    )
+
+    plt.savefig(oname, bbox_inches='tight')
 
 def create_adcp_output_file(t0, oname="adcp_mean_ns", idir="./", odir="./"):
     """creates an output adcp file
@@ -980,7 +1016,7 @@ def test_adcp_vz():
             map_vz.append([datetime.fromisoformat(
                 "2023-06-27 00:00:00").timestamp(), la, lo, v])
 
-        map(map_vz, "vz_2706.html", "adcp_vz")
+        ccmap(map_vz, "vz_2706.pdf", "adcp_vz")
 
         fig, ax = plt.subplots()
         vp = np.transpose(np.array(vp))
@@ -1010,7 +1046,7 @@ def all_adcp_vz():
             except:
                 print("bad adcp mean file")
 
-    map(map_vz, "/home/metivier/Nextcloud/Recherche/Dziani/2023/Maps/vz_2706.html", "adcp_vz")
+    ccmap(map_vz, "/home/metivier/Nextcloud/Recherche/Dziani/2023/Maps/vz_2706.pdf", "adcp_vz")
 
 
 def v_r_from_plateforme():
@@ -1105,6 +1141,140 @@ def v_r_from_bullage_nord():
         with open(fname, 'a') as f:
             f.write(str(r)+";"+str(d[3])+"\n")
 
+def fit_panache_gaussien():
+
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+    file = "r_v_p.txt"
+    #
+    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
+    #
+    dr = 6
+    R = dat[:,0]-dr
+    U = dat[:,1]
+    plt.figure()
+    plt.loglog(np.abs(R),U, '.', color='C0',
+             label="Valeur moyenne d'un ensemble")
+
+    #get rid of <=0 vals
+    R=R[U>0]
+    U=U[U>0]
+
+    r2 = np.linspace(0.05, 10, 50)
+    v_moy = np.zeros(len(r2))
+    v_max = np.zeros(len(r2))
+    #
+    for i in range(len(r2)-1):
+        tmp = 0
+        indexes = []
+        for j in range(len(R)):
+            if r2[i] <= np.abs(R[j]) < r2[i+1]:
+                if U[j] >= v_max[i]:
+                    v_max[i] = U[j]
+                tmp += U[j]
+                indexes.append(j)
+            if len(indexes) > 0:
+                v_moy[i] = tmp/len(indexes)
+                np.delete(dat, indexes)
+
+    plt.loglog(r2,v_moy, '.', color='C1', ms=10,
+             label="moyenne par bin de 0.5m")
+
+    plt.loglog(r2,v_max, '.', color='C3', ms=10,
+             label="maximum par bin de 0.5m")
+
+    U=U[R<5]
+    R=R[R<5]
+    lU=np.log(U)
+
+    p_list=[]
+    for v,c in zip((v_moy,v_max),['C1','C3']):
+        r2 = np.linspace(0.05, 10, 50)
+
+        r2 = r2[v>0]
+        v=v[v>0]
+
+        v=v[r2<5]
+        r2=r2[r2<5]
+
+        p = np.polyfit(r2**2,np.log(v),1)
+        p_list.append(p)
+        print(np.abs(p[0])**-0.5, np.exp(p[1]))
+        f = np.poly1d(p)
+
+        r=np.linspace(0.1,10,1000)
+        plt.loglog(r,np.exp(f(r**2)),'--',color=c, label='Gaussienne: $b=%4.2f$ m, $U=%4.0f$ mm/s' % (np.abs(p[0])**-0.5, np.exp(p[1])))
+
+
+
+    plt.xlabel("Distance au centre du panache (m)")
+    plt.ylabel("vitesse  verticale (mm/s)")
+    plt.xlim((0.1, 100))
+    plt.ylim((0.1, 400))
+    plt.legend()
+
+    plt.savefig(dir+"pp_fit_gaussienne.pdf", bbox_inches='tight')
+
+    return p_list
+
+def panache_gaussien():
+
+    p_list = fit_panache_gaussien()
+
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+    file = "r_v_p.txt"
+    #
+    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
+    #
+    plt.figure()
+    plt.plot(dat[:, 0], dat[:, 1], '.', color='C0',
+             label="Valeur moyenne d'un ensemble")
+
+    r = np.linspace(0,100,1000)
+    b = 2
+    dr = 6
+    for p,c in zip(p_list,['C1','C3']):
+        z = np.exp(p[1])*np.exp(p[0]*r**2)
+        plt.plot(r+dr,z,'--', lw=2, color=c, label='Gaussien, $b=%4.1f$ m, $U=%4.0f$ mm/s' % (np.abs(p[0])**-0.5, np.exp(p[1])))
+        plt.plot(-r[:40]+dr,z[:40],'--', lw=2, color=c)
+
+
+
+    plt.xlabel("Distance à la plateforme (m)")
+    plt.ylabel("vitesse moyenne verticale (mm/s)")
+    plt.xlim((0, 30))
+    plt.ylim((-100, 400))
+    plt.legend()
+    plt.savefig(dir+"panache_plateforme_gaussienne.pdf", bbox_inches='tight')
+
+
+def fit_panache_bouchon():
+
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+    file = "r_v_p.txt"
+    #
+    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
+    #
+    dr = 6
+    R = dat[:,0]-dr
+
+    U = dat[:,1]
+
+    b=2.5
+    Ub = np.mean(U[np.abs(R)<=b])
+
+    plt.figure()
+    plt.plot(np.abs(R),U, '.', color='C0',
+             label="Valeur moyenne d'un ensemble")
+
+    plt.plot([0,b,b,30],[Ub,Ub,0,0],'--',lw=2,color='C1',label='Profil bouchon $b=%3.1f$ m, $U=%3.0f$ mm/s' % (b,Ub))
+
+
+    plt.xlabel("Distance à la plateforme (m)")
+    plt.ylabel("vitesse moyenne verticale (mm/s)")
+    plt.xlim((0, 30))
+    plt.ylim((-100, 400))
+    plt.legend()
+    plt.savefig(dir+"pp_bouchon.pdf", bbox_inches='tight')
 
 if __name__ == "__main__":
 
@@ -1121,37 +1291,8 @@ if __name__ == "__main__":
     # synchronise_EXO_v2()
     # map_exo()
     # v_r_from_bullage_nord()
-    v_r_from_plateforme()
-
-    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
-    file = "r_v_p.txt"
-
-    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
-
-    plt.figure()
-    plt.plot(dat[:, 0], dat[:, 1], '.', color='C0',
-             label="Valeur moyenne d'un ensemble")
-
-    r2 = np.arange(0, 200, 1)
-    v = np.zeros(len(r2))
-
-    for i in range(len(r2)-1):
-        tmp = 0
-        indexes = []
-        for j in range(len(dat)):
-            if r2[i] <= dat[j, 0] < r2[i+1]:
-                tmp += dat[j, 1]
-                indexes.append(j)
-            if len(indexes) > 0:
-                v[i] = tmp/len(indexes)
-                np.delete(dat, indexes)
-
-    plt.plot(r2+0.5, v, 'o-', color='C1', label="Moyenne sur un rayon de 1m")
-    plt.plot([0, 200], [0, 0], 'k--')
-    plt.xlabel("Distance à la plateforme (m)")
-    plt.ylabel("vitesse moyenne verticale (mm/s)")
-    plt.xlim((0, 50))
-    plt.ylim((-100, 400))
-    plt.legend()
-    plt.savefig(dir+"panache_plateforme.pdf", bbox_inches='tight')
+    # v_r_from_plateforme()
+    #
+    fit_panache_bouchon()
+    panache_gaussien()
     plt.show()
