@@ -28,6 +28,10 @@ from branca.element import MacroElement
 from jinja2 import Template
 
 from LibDecode import *
+from sqlalchemy import create_engine
+
+engine = create_engine("mysql://root:iznogod01@localhost/Mayotte")
+conn = engine.connect()
 
 
 class BindColormap(MacroElement):
@@ -145,7 +149,7 @@ def map(data, oname='out.html', map_type='gps'):
             <li>mdate: %s</li>
             <li>v_z:%4.0f</li>
             </p></html>
-            """ % (datetime.fromtimestamp(l[0]), l[3])
+            """ % (l[0], l[3])
             folium.CircleMarker(location=[l[1], l[2]],
                                 radius=5,
                                 color=None,
@@ -194,7 +198,7 @@ def ccmap(data, oname='out.pdf', map_type='gps'):
 
     plt.savefig(oname, bbox_inches='tight')
 
-def create_adcp_output_file(t0, oname="adcp_mean_ns", idir="./", odir="./"):
+def create_adcp_output_file(t0, oname="adcp_mean_ns", zsam=-1, idir="./", odir="./"):
     """creates an output adcp file
 
     :param t0: int file code
@@ -217,10 +221,12 @@ def create_adcp_output_file(t0, oname="adcp_mean_ns", idir="./", odir="./"):
             odir, "boat_trajectory_"+str(t0)+"_processed.txt")
         if len(r.VGeo) > 0:
             N = len(r.VGeo)
-            if N > 1:
+            if N > 1 and zsam == -1:
                 v = np.mean(r.VGeo, axis=0)
-            else:
+            elif zsam==-1 and N<=1:
                 v = r.VGeo[0]
+            elif zsam >=0:
+                v = r.VGeo[zsam]
             print(v)
             vx = v[1]  # -r.gps_info[4]
             vy = v[2]  # -r.gps_info[5]
@@ -230,6 +236,7 @@ def create_adcp_output_file(t0, oname="adcp_mean_ns", idir="./", odir="./"):
                     r.gps_info[0], r.gps_info[1], r.gps_info[2], r.gps_info[3], r.gps_info[4]*1000, r.gps_info[5]*1000, r.gps_info[6]*1000, vx, vy, vz, N))
                 print("%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n" % (
                     r.gps_info[0], r.gps_info[1], r.gps_info[2], r.gps_info[3], r.gps_info[4]*1000, r.gps_info[5]*1000, r.gps_info[6]*1000, vx, vy, vz, N))
+
 
 
 def create_output_files(t0, gpsname="GPS_processed.txt", paname="PA_processed.txt", idir='./'):
@@ -962,7 +969,62 @@ def test_adcp_mean():
             create_adcp_output_file(t0, idir=idir, odir=odir)
 
 
+def intensity_profile(t_begin,t_end):
+    idir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Raw/2706/"
+    pdir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/"
+    t0list = [1687858603, 1687865787]
+    keep = []
+    v = []
+    ECIP = []
+    for t0 in t0list:
+        print("loading ADCP profiles...")
+        res = read_ADCP(t0, idir)
+        zp = res[0].Data["Depth"]
+        lat = []
+        lon = []
+        act = []
+        for i in range(len(res)):
+            P = res[i]
+            if t_begin <= res[i].ac_time <= t_end:
+                print("synchronizing profiles %i..." % (i))
+                P.synchronize_with_gps(
+                    pdir, "boat_trajectory_"+str(t0)+"_processed.txt")
+                keep.append(P.ac_time)
+                v.append([P.gps_info[4],P.gps_info[5]])
+                EID=[]
+                for d in P.Data["Echo Intensity"]:
+                    EID.append(np.mean(np.array(d)))
+                ECIP.append(EID)
+
+    sd = 0
+    distance=[]
+
+    ts = keep[0]
+    for i in range(len(keep)):
+        sd+= np.sqrt( v[i][0]**2 + v[i][1]**2 )*(keep[i]-ts)
+        distance.append(sd)
+        ts = keep[i]
+
+    print(ECIP)
+
+    sh = np.shape(ECIP)
+    # # map_ax.scatter(lon, lat, c=vmean, transform=ccrs.PlateCarree())
+
+    fig = plt.figure(figsize=(20,5))
+    echo = np.transpose(np.array(ECIP))
+    plt.imshow(echo, aspect='auto', cmap='seismic')
+    plt.colorbar()
+    plt.yticks(range(sh[1]),np.array(zp)/100)
+    plt.savefig('test_eco.pdf',bbox_inches='tight')
+    
+    fig, ax  = plt.subplots()
+    ax.plot(distance)
+    plt.show()
+
+
+
 def test_adcp_vz():
+
     idir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Raw/2706/"
     pdir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/"
     t0list = [1687858603, 1687865787]
@@ -979,6 +1041,7 @@ def test_adcp_vz():
         d = []
         lat = []
         lon = []
+        act = []
         for i in range(len(res)):
             P = res[i]
             print("synchronizing profiles %i..." % (i))
@@ -1005,6 +1068,7 @@ def test_adcp_vz():
                 vmean.append(np.mean(vp_no_nan[i]))
                 lat.append(res[i].gps_info[1])
                 lon.append(res[i].gps_info[2])
+                act.append(res[i].ac_time)
         print(vmean)
         print(lon, lat)
 
@@ -1012,17 +1076,40 @@ def test_adcp_vz():
         # map_ax.scatter(lon, lat, c=vmean, transform=ccrs.PlateCarree())
 
         map_vz = []
-        for la, lo, v in zip(lat, lon, vmean):
-            map_vz.append([datetime.fromisoformat(
-                "2023-06-27 00:00:00").timestamp(), la, lo, v])
+        for a, la, lo, v in zip(act, lat, lon, vmean):
+            map_vz.append([a, la, lo, v])
 
-        ccmap(map_vz, "vz_2706.pdf", "adcp_vz")
+        # ccmap(map_vz, "vz_2706.pdf", "adcp_vz")
+        map(map_vz,'vz_timestamp.html',"adcp_vz")
 
         fig, ax = plt.subplots()
         vp = np.transpose(np.array(vp))
         ax.imshow(vp, aspect='auto', cmap='bwr')
         plt.yticks(np.arange(6)*5, np.arange(6)*5*0.5+0.25)
     plt.show()
+
+def sql_adcp_vp():
+    idir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Raw/2706/"
+    pdir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/"
+    t0list = [1687858603, 1687865787]
+    # map = plt.figure()
+    # map_ax = map.add_subplot(111, projection=ccrs.PlateCarree())
+    # map_ax.set_extent((45.284, 45.295, -12.765, -12.775))
+
+
+    for t0 in t0list:
+        print("loading ADCP profiles...")
+        res = read_ADCP(t0, idir)
+        for i in range(len(res)):
+            P = res[i]
+            print("synchronizing profiles %i..." % (i))
+            P.synchronize_with_gps(
+                pdir, "boat_trajectory_"+str(t0)+"_processed.txt")
+            for v in P.VGeo:
+                sql = "insert into ADCP_vel  values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)" % (P.gps_info[0], P.gps_info[1], P.gps_info[2], P.gps_info[3], P.gps_info[4]*1000, P.gps_info[5]*1000, P.gps_info[6]*1000, v[0],v[1],v[2],v[3],v[4])
+                conn.execute(sql)
+
+
 
 
 def all_adcp_vz():
@@ -1048,6 +1135,34 @@ def all_adcp_vz():
 
     ccmap(map_vz, "/home/metivier/Nextcloud/Recherche/Dziani/2023/Maps/vz_2706.pdf", "adcp_vz")
 
+
+def sql_v_r_from_plateforme():
+
+    engine = create_engine("mysql://root:iznogod01@localhost/Mayotte")
+    conn = engine.connect()
+
+    wgs84_geod = pyproj.Geod(ellps='WGS84')
+    dstProj = pyproj.Proj(proj="utm", zone="38",
+                          ellps="WGS84", units="m", south=True)
+    srcProj = pyproj.Proj(proj="longlat", ellps="WGS84", datum="WGS84")
+
+    lat_p = -1 * (12 + 46/60 + 13.7/3600)
+    lon_p = 45 + 17/60 + 22.0/3600
+
+    x_p, y_p = pyproj.transform(srcProj, dstProj, lon_p, lat_p)
+
+    sql = "select * from ADCP_vel"
+    res = conn.execute(sql).fetchall()
+    for r in res:
+        print(r)
+        x, y = pyproj.transform(srcProj, dstProj, r[2], r[1])
+        R = np.sqrt((x-x_p)**2 + (y-y_p)**2)
+        vx = r[8]-r[4]
+        vy = r[9]-r[5]
+        vz = r[10]-r[6]
+        z = r[7]
+        sql = "insert into ADCP_pf values (%s,%s,%s,%s,%s)" % (R,z,vx,vy,vz)
+        conn.execute(sql)
 
 def v_r_from_plateforme():
     """plot vz(r) whree r i radius from plateforme
@@ -1141,19 +1256,138 @@ def v_r_from_bullage_nord():
         with open(fname, 'a') as f:
             f.write(str(r)+";"+str(d[3])+"\n")
 
+def fit_poiseuille():
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+
+    sql = "select abs(r-6), avg(vz) from ADCP_pf where z=125 and abs(r-6) < 30 group by abs(r-6) order by abs(r-6) asc"
+    res= conn.execute(sql).fetchall()
+    d = np.array(res).T
+    R=d[0]
+    U=d[1]
+
+    plt.figure()
+    plt.loglog(np.abs(R),U, '.', color='C0',
+             label="$v_z$ ($0.75\leq z \leq 1.25$m)")
+
+    #get rid of <=0 vals
+    R=R[U>0]
+    U=U[U>0]
+
+    U=U[R<5]
+    R=R[R<5]
+
+    plt.loglog(R,ma(R,U),color='C1',lw=2)
+    p = np.polyfit(np.log10(R),np.log10(U),1)
+    print(p[0], 10**p[1])
+    f = np.poly1d(p)
+
+    r=np.linspace(0.1,10,1000)
+    plt.loglog(r,10**f(np.log10(r)),'--',color='C1')
+
+
+
+    plt.xlabel("Distance au centre du panache (m)")
+    plt.ylabel("vitesse  verticale (mm/s)")
+    plt.xlim((0.1, 100))
+    plt.ylim((0.1, 400))
+    plt.legend()
+
+    # plt.savefig(dir+"pp_poiseuille.pdf", bbox_inches='tight')
+
+    return p
+
+def fit_panache_power():
+
+    """ajuste une gaussienne sur la moyenne glissante
+    """
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+
+    sql = "select abs(r-6.5), avg(vz) from ADCP_pf where z=125 and abs(r-6.5) < 30 group by abs(r-6.5) order by abs(r-6.5) asc"
+    res= conn.execute(sql).fetchall()
+    d = np.array(res).T
+    R0=d[0]
+    U0=d[1]
+
+    plt.figure()
+    plt.loglog(np.abs(R0),U0, '.', color='C0',
+             label="$v_z$ ($0.75\leq z \leq 1.25$m)")
+
+    v_moy = np.array(ma(R0,U0))
+
+    plt.loglog(np.abs(R0),ma(R0,U0,1), '.', color='C1',
+             label="Moyenne glissante")
+
+
+    VM = v_moy[R0>1]
+    R = R0[R0>1]
+    lR = np.log10(R[VM>0])
+    lU = np.log10(VM[VM>0])
+
+
+
+    p = np.polyfit(lR,lU,1)
+    print(p[0], 10**np.exp(p[1]))
+    f = np.poly1d(p)
+    r=np.linspace(0.1,10,1000)
+    plt.loglog(R0,10**f(np.log10(R0)),'--',color='C1', lw=2, label='Loi de puissance: $U =%4.0f R^{%4.2f}$ mm/s' % (10**p[1],p[0]))
+
+    plt.xlabel("Distance au centre du panache (m)")
+    plt.ylabel("Vitesse  verticale (mm/s)")
+    plt.xlim((0.1, 100))
+    plt.ylim((0.1, 400))
+    plt.legend()
+
+    plt.savefig(dir+"pp_fit_puissance.pdf", bbox_inches='tight')
+
+def plot_panache_gaussien():
+    a = 0.157 * 5 / 6
+    Q = 0.01
+
+    z = np.linspace(0.1,12,100)
+
+    R = 6*a*z / 5
+    U = 5/(6*a) * (9*a*Q/10)**(1/3) * z**(-1/3)
+    gp = 5*Q/(6*a) * (9*a*Q/10)**(-1/3) * z**(-5/3)
+
+    fig = plt.figure(figsize=(15/2.5,10/2.5))
+    ax=[]
+    for i in range(3):
+        ax.append(fig.add_subplot(1,3,i+1))
+
+
+    ax[0].plot(R,z)
+    ax[0].set_ylabel('Hauteur (m)')
+    ax[0].set_xlabel('Rayon du panache (m)')
+    ax[1].plot(U,z)
+    ax[1].set_xlabel('Vitesse centrale (m/s)')
+    ax[2].plot(gp,z)
+    ax[2].set_xlabel('Flottabilité (m/s$^-2$)')
+
+    plt.savefig('/home/metivier/Nextcloud/Recherche/Dziani/tex/figures/panache_auto_similaire.pdf',bbox_inches='tight')
+
+
 def fit_panache_gaussien():
 
     dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
-    file = "r_v_p.txt"
-    #
-    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
-    #
-    dr = 6
-    R = dat[:,0]-dr
-    U = dat[:,1]
+    # file = "r_v_p.txt"
+    # #
+    # dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
+    # #
+    # dr = 6
+    # R = dat[:,0]-dr
+    # U = dat[:,1]
+
+    sql = "select abs(r-6.5), avg(vz) from ADCP_pf where z=125 and abs(r-6.5) < 30 group by abs(r-6.5) order by abs(r-6) asc"
+    res= conn.execute(sql).fetchall()
+    d = np.array(res).T
+    R=d[0]
+    U=d[1]
+
     plt.figure()
     plt.loglog(np.abs(R),U, '.', color='C0',
-             label="Valeur moyenne d'un ensemble")
+             label="$v_z$ ($0.75\leq z \leq 1.25$m)")
+
+
 
     #get rid of <=0 vals
     R=R[U>0]
@@ -1174,7 +1408,7 @@ def fit_panache_gaussien():
                 indexes.append(j)
             if len(indexes) > 0:
                 v_moy[i] = tmp/len(indexes)
-                np.delete(dat, indexes)
+                # np.delete(dat, indexes)
 
     plt.loglog(r2,v_moy, '.', color='C1', ms=10,
              label="moyenne par bin de 0.5m")
@@ -1207,7 +1441,7 @@ def fit_panache_gaussien():
 
 
     plt.xlabel("Distance au centre du panache (m)")
-    plt.ylabel("vitesse  verticale (mm/s)")
+    plt.ylabel("Vitesse  verticale (mm/s)")
     plt.xlim((0.1, 100))
     plt.ylim((0.1, 400))
     plt.legend()
@@ -1221,21 +1455,35 @@ def panache_gaussien():
     p_list = fit_panache_gaussien()
 
     dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
-    file = "r_v_p.txt"
+    # file = "r_v_p.txt"
     #
-    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
+    # dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
     #
+
+    sql = "select abs(r), avg(vz) from ADCP_pf where z=125 and abs(r) < 30 group by abs(r) order by abs(r) asc"
+    res= conn.execute(sql).fetchall()
+    d = np.array(res).T
+    R=d[0]
+
+    U=d[1]
     plt.figure()
-    plt.plot(dat[:, 0], dat[:, 1], '.', color='C0',
-             label="Valeur moyenne d'un ensemble")
+    plt.plot(R, U, '.', color='C0',
+             label="$v_z$ ($0.75\leq z \leq 1.25$m)")
 
     r = np.linspace(0,100,1000)
     b = 2
-    dr = 6
-    for p,c in zip(p_list,['C1','C3']):
-        z = np.exp(p[1])*np.exp(p[0]*r**2)
-        plt.plot(r+dr,z,'--', lw=2, color=c, label='Gaussien, $b=%4.1f$ m, $U=%4.0f$ mm/s' % (np.abs(p[0])**-0.5, np.exp(p[1])))
-        plt.plot(-r[:40]+dr,z[:40],'--', lw=2, color=c)
+    dr = 6.5
+    # plt.plot(R, ma(R,U), '-', lw=2, color='C0', label='Moyenne glissante')
+
+    p = p_list[1]
+    c = 'C1'
+    # for p,c in zip(p_list,['C1','C3']):
+    Rb = 1.5
+    Ub =350
+    print(Rb)
+    z = Ub*np.exp(-r**2 / (Rb**2))
+    plt.plot(r+dr,z,'-', lw=3, color=c, label='Gaussien, $R=%4.1f$ m, $U=%4.0f$ mm/s' % (Rb, Ub))
+    plt.plot(-r[:40]+dr,z[:40],'-', lw=3, color=c)
 
 
 
@@ -1246,25 +1494,80 @@ def panache_gaussien():
     plt.legend()
     plt.savefig(dir+"panache_plateforme_gaussienne.pdf", bbox_inches='tight')
 
+def deform_gaussien_adcp():
+
+    r = np.linspace(-20,20,1000)
+    v0 = 0.3
+    b0 = 3
+    z0 = 12-0.75
+
+    fig = plt.figure(figsize=(15/2.5,15/2.5))
+    ax=[]
+
+    Eangle = np.random.randn(1000)*90*np.pi/180
+    # Eangle=0
+    # u = v0*np.exp(-r**2 / (2*(b0/2)**2))
+    # plt.plot(r,u)
+
+    zlist = [1,2,3]
+
+    color=['C1','C2','C3','C4','C5']
+    a = 20
+    i=0
+    for z,c in zip(zlist,color):
+        ax.append(fig.add_subplot(3,1,i+1))
+
+        b = (b0/z0)*(12-z)
+        v = (v0*z0**(1/3))*(12-z)**(-1/3)
+
+        dx = 2*z*np.tan(a*np.pi/180)
+
+        u = v*np.exp(-r**2 / (2*(b/2)**2))
+        ax[i].plot(r,u,'--', color=c, label='Profil théorique')
+
+        v_adcp = 0.25 * (
+        v*np.exp(-((r+dx*np.cos(Eangle))**2+(dx*np.sin(Eangle))**2) / (2*(b/2)**2)) +
+        v*np.exp(-((r+dx*np.cos(Eangle+np.pi))**2+(dx*np.sin(Eangle+np.pi))**2) / (2*(b/2)**2)) +
+        v*np.exp(-((r+dx*np.cos(Eangle+np.pi/2))**2+(dx*np.sin(Eangle+np.pi/2))**2) / (2*(b/2)**2)) +
+        v*np.exp(-((r+dx*np.cos(Eangle+3*np.pi/2))**2+(dx*np.sin(Eangle+3*np.pi/2))**2) / (2*(b/2)**2))
+        )
+
+        ax[i].plot(r,v_adcp,'-', color=c, label="Profil ADCP")
+        ax[i].legend()
+        ax[i].text(-20,0.25,'z=%i m'%z)
+        i+=1
+
+    ax[1].set_ylabel("Vitesse verticale (m/s)")
+    ax[2].set_xlabel("Distance au centre du panache (m)")
+
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+    plt.savefig(dir+'deform_adcp.pdf', bbox_inches='tight')
 
 def fit_panache_bouchon():
 
+    # ancienne version
     dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
-    file = "r_v_p.txt"
+    # file = "r_v_p.txt"
+    # #
+    # dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
+    # #
+    # dr = 6
+    # R = dat[:,0]-dr
     #
-    dat = np.loadtxt(dir+file, skiprows=1,  delimiter=';')
-    #
-    dr = 6
-    R = dat[:,0]-dr
+    # U = dat[:,1]
 
-    U = dat[:,1]
+    sql = "select abs(r-6), avg(vz) from ADCP_pf where z=125 and abs(r-6) < 30 group by abs(r-6) order by abs(r-6) asc"
+    res= conn.execute(sql).fetchall()
+    d = np.array(res).T
+    R=d[0]
+    U=d[1]
 
     b=2.5
     Ub = np.mean(U[np.abs(R)<=b])
 
     plt.figure()
     plt.plot(np.abs(R),U, '.', color='C0',
-             label="Valeur moyenne d'un ensemble")
+             label="v_z ($0.75\leq z \leq 1.25$m)")
 
     plt.plot([0,b,b,30],[Ub,Ub,0,0],'--',lw=2,color='C1',label='Profil bouchon $b=%3.1f$ m, $U=%3.0f$ mm/s' % (b,Ub))
 
@@ -1276,23 +1579,120 @@ def fit_panache_bouchon():
     plt.legend()
     plt.savefig(dir+"pp_bouchon.pdf", bbox_inches='tight')
 
+def ma(x,y, xwin=1):
+    """ moving average of y(x) calculated over window xwin
+
+    :param x: x vector
+    :param y: y vector to average
+    :param xwin: value of x-window over which to average y
+
+    :returns: ma moving average vector of size len(x)
+    """
+
+    ma = []
+    for i in range(len(x)):
+        y_tmp = y[x>=x[i]-xwin]
+        x_tmp = x[x>=x[i]-xwin]
+        y_tmp = y_tmp[x_tmp<x[i]+xwin]
+        ma.append(np.mean(y_tmp))
+
+    return ma
+
+def profils_r_u_z():
+    """profils U(R) à différentes profondeurs, tentative de calcul de Q"""
+
+    dir = "/home/metivier/Nextcloud/Recherche/Dziani/2023/Processed/2706/"
+
+    zlist= [75,575,1075,1275]
+    fig = plt.figure(figsize=(15/2.5,20/2.5))
+    ax = []
+    s = fig.add_axes([0.07,0.07,0.8,0.8])
+    s.set_ylabel('Vitesse verticale (mm/s)')
+    s.set_xlabel('Distance au centre du panache (m)')
+    s.spines["left"].set_visible(False)
+    s.spines["top"].set_visible(False)
+    s.spines["right"].set_visible(False)
+    s.spines["bottom"].set_visible(False)
+    s.set_xticks([])
+    s.set_yticks([])
+    # s.yaxis.set_visible(False)
+
+    qtot=[]
+    dtot=[]
+    for i in range(len(zlist)):
+        ax.append(fig.add_subplot(4,1,i+1))
+        sql = "select abs(r-6), avg(vz) from ADCP_pf where z=%s and abs(r-6) < 20 group by abs(r-6) order by abs(r-6) asc" % (zlist[i])
+        res= conn.execute(sql).fetchall()
+        d = np.array(res).T
+
+        q = []
+        qval=0
+        for y,r,dr in zip(ma(d[0],d[1])[:-1],d[0][:-1],np.diff(d[0])):
+            qval += 1e-3*y*2*np.pi*r*dr
+            print(qval)
+            q.append(qval)
+
+        qtot.append(q)
+        dtot.append(d[0][:-1])
+        ax[i].plot(d[0],d[1],'o', color='C0', label='z=%4.2f - %4.2f m' % ((zlist[i]-50)/100,zlist[i]/100))
+        ax[i].plot(d[0],ma(d[0],d[1]),'-',color='C1',label='Moyenne glissante (1m)')
+        ax[i].set_xlim(0,20)
+        ax[i].set_ylim(-100,500)
+        ax[i].set_yticks([0,200,400])
+        ax[i].legend()
+
+    plt.savefig(dir+'Profil_vz.pdf',bbox_inches='tight')
+
+
+    f = plt.figure(figsize=(15/2.5,20/2.5))
+
+    s = f.add_axes([0.07,0.07,0.8,0.8])
+    s.set_ylabel('flux (m$^3$/s)')
+    s.set_xlabel('Distance au centre du panache (m)')
+    s.spines["left"].set_visible(False)
+    s.spines["top"].set_visible(False)
+    s.spines["right"].set_visible(False)
+    s.spines["bottom"].set_visible(False)
+    s.set_xticks([])
+    s.set_yticks([])
+    a=[]
+    for i in range(len(dtot)):
+        a.append(f.add_subplot(4,1,i+1))
+        a[i].plot(dtot[i],qtot[i],label='z=%4.2f - %4.2f m' % ((zlist[i]-50)/100,zlist[i]/100))
+
+        a[i].set_xlim(0,20)
+        a[i].legend()
+        # a[i].set_ylim(0,20)
+        # a[i].set_yticks([0,5,10,15])
+    plt.savefig(dir+'Profil_Q.pdf',bbox_inches='tight')
+
 if __name__ == "__main__":
 
     ######################################################
     # reads the code of the last acquisition and decodes
     ######################################################
     # map_gps_tot()
-    # test_adcp_vz()
+    # sql_adcp_vp()
+    # sql_v_r_from_plateforme()
     # boat_trajectories()
     # test_adcp_mean()
     # map_velocities()
     # all_adcp_vz()
+    # test_adcp_vz()
     # map_boat_velocity_mplleaflet()
     # synchronise_EXO_v2()
     # map_exo()
     # v_r_from_bullage_nord()
     # v_r_from_plateforme()
     #
-    fit_panache_bouchon()
-    panache_gaussien()
-    plt.show()
+    # fit_panache_bouchon()
+    # panache_gaussien()
+    # fit_panache_power()
+    # fit_poiseuille()
+    # deform_gaussien_adcp()
+    # plot_panache_gaussien()
+    t_start = 1687861481.282519
+    t_end = 1687863349.78928
+
+    intensity_profile(t_start,t_end)
+    # plt.show()

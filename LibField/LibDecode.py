@@ -124,7 +124,7 @@ class ADCPEnsemble:
     def FilterVel(self):
         """filter good velocities
 
-        checks for cells with four good beams
+        checks for cells with four values
 
         returns z, vx,vy,vz
         """
