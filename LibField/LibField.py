@@ -402,4 +402,4 @@ def mylog(sentence=""):
 
 
 if __name__ == '__main__':
-    test_ADCP()
+    get_PA500()

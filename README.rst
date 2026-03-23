@@ -37,4 +37,4 @@ Runscripts
 
 Dependancies:
 =============
-pynmea2 and gpxpy are installed during setup, but you also need SeriaDeviceRetriever that must be downloiaded from the github reposit: https://github.com/odevauchelle/SerialDeviceRetriever.
+pynmea2 and gpxpy are installed during setup, but you also need SeriaDeviceRetriever that must be downloaded from the github reposit: https://github.com/odevauchelle/SerialDeviceRetriever.
